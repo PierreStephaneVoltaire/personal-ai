@@ -1,80 +1,70 @@
-
 variable "aws_region" {
-  description = "AWS region for deployment"
-  type        = string
-  default     = "us-east-1"
+  type    = string
+  default = "us-east-1"
 }
 
 variable "project_name" {
-  description = "Project name prefix for all resources"
-  type        = string
-  default     = "personal-llm"
+  type    = string
+  default = "ollama-gpu"
+}
+
+variable "allowed_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed to access LiteLLM and OpenWebUI"
+  default     = ["0.0.0.0/0"]
+}
+
+variable "controller_instance_type" {
+  type    = string
+  default = "t3.small"
 }
 
 variable "max_uptime_minutes" {
-  description = "Maximum uptime in minutes before GPU instances are automatically stopped"
-  type        = number
-  default     = 30
-}
-
-variable "models_volume_size_gb" {
-  description = "Size of EBS volumes for model storage (in GB)"
-  type        = number
-  default     = 100
-}
-
-variable "models_mount_path" {
-  description = "Mount path for models directory"
-  type        = string
-  default     = "/opt/models"
-}
-
-variable "vpc_cidr" {
-  description = "CIDR block for VPC"
-  type        = string
-  default     = "10.0.0.0/16"
-}
-
-variable "public_subnet_cidr" {
-  description = "CIDR block for public subnet"
-  type        = string
-  default     = "10.0.1.0/24"
-}
-
-variable "availability_zone" {
-  description = "Availability zone for resources"
-  type        = string
-  default     = "us-east-1a"
+  type    = number
+  default = 30
 }
 
 variable "gpu_tiers" {
-  description = "GPU tier configurations mapping VRAM requirements to EC2 instance types"
   type = map(object({
     instance_type = string
     vram_gb       = number
-    description   = string
+    ebs_size_gb   = number
   }))
   default = {
     "8gb" = {
       instance_type = "g4dn.xlarge"
       vram_gb       = 16
-      description   = "8GB tier - g4dn.xlarge with 16GB VRAM"
+      ebs_size_gb   = 50
     }
     "18gb" = {
       instance_type = "g5.xlarge"
       vram_gb       = 24
-      description   = "18GB tier - g5.xlarge with 24GB VRAM"
+      ebs_size_gb   = 100
     }
     "32gb" = {
       instance_type = "g5.4xlarge"
       vram_gb       = 48
-      description   = "32GB tier - g5.4xlarge with 48GB VRAM"
+      ebs_size_gb   = 200
     }
   }
 }
 
-variable "controller_instance_type" {
-  description = "Instance type for the LiteLLM controller"
-  type        = string
-  default     = "t3.micro"
+variable "enable_knowledge_base" {
+  type    = bool
+  default = false
+}
+
+variable "knowledge_base_instance_type" {
+  type    = string
+  default = "t3.medium"
+}
+
+variable "knowledge_base_volume_size_gb" {
+  type    = number
+  default = 50
+}
+
+variable "enable_functions" {
+  type    = bool
+  default = false
 }
