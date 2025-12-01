@@ -4,8 +4,8 @@
 resource "random_password" "db_password" {
   length           = 32
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
-}
+ override_special = "!#$%&*()-_=+[]{}<>?"
+ }
 
 # =============================================================================
 # RDS PostgreSQL Instance
@@ -83,7 +83,7 @@ resource "aws_ssm_parameter" "db_connection_string" {
   name        = "/${var.project_name}/db/connection_string"
   description = "PostgreSQL database connection string"
   type        = "SecureString"
-  value       = "postgresql://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
+  value       = "postgresql://${var.db_username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
 
   tags = {
     Name = "${var.project_name}-db-connection-string"
