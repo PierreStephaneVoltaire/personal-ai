@@ -1,158 +1,324 @@
-# GPU-based Ollama Deployment on AWS
+# OpenWebUI + LiteLLM Infrastructure
 
-Terraform configuration for multi-tier GPU infrastructure running Ollama with LiteLLM proxy and automatic instance management.
+A Terraform-managed infrastructure for deploying OpenWebUI with LiteLLM as a proxy to OpenRouter, backed by PostgreSQL RDS for persistence.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         VPC                                  │
-│  ┌─────────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │ Controller  │  │ 8GB GPU  │  │ 18GB GPU │  │ 32GB GPU │  │
-│  │ (LiteLLM)   │→ │g4dn.xl   │  │ g5.xl    │  │ g5.4xl   │  │
-│  │ (OpenWebUI) │  │ (Ollama) │  │ (Ollama) │  │ (Ollama) │  │
-│  └─────────────┘  └──────────┘  └──────────┘  └──────────┘  │
-│        ↑               ↑              ↑             ↑       │
-│        │          [EBS 50GB]    [EBS 100GB]   [EBS 200GB]   │
-│        │                                                     │
-│  ┌─────────────┐  ┌─────────────────────────────────────┐   │
-│  │ Start/Stop  │  │       Knowledge Base (optional)      │   │
-│  │  Lambdas    │  │  (ChromaDB + supplements + rules)    │   │
-│  └─────────────┘  └─────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                              VPC                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                      Public Subnets                            │  │
+│  │                                                                 │  │
+│  │   ┌─────────────────────────────────────────────────────────┐  │  │
+│  │   │              EC2 Spot Instance (ASG)                     │  │  │
+│  │   │   ┌─────────────┐        ┌──────────────┐               │  │  │
+│  │   │   │  OpenWebUI  │───────▶│   LiteLLM    │──────────────────────▶ OpenRouter
+│  │   │   │   :3000     │        │    :4000     │               │  │  │
+│  │   │   └─────────────┘        └──────────────┘               │  │  │
+│  │   │          │                      │                        │  │  │
+│  │   └──────────┼──────────────────────┼────────────────────────┘  │  │
+│  │              │                      │                           │  │
+│  │              ▼                      ▼                           │  │
+│  │   ┌─────────────────────────────────────────────────────────┐  │  │
+│  │   │              RDS PostgreSQL (db.t4g.micro)               │  │  │
+│  │   │                    Shared Database                        │  │  │
+│  │   └─────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────┐   ┌────────────┐   ┌─────────────────────────────┐  │
+│  │ Elastic IP │   │  Lambda    │   │   SSM Parameter Store       │  │
+│  │            │◀──│  (EIP      │   │   - OpenRouter API Key      │  │
+│  │            │   │   Attach)  │   │   - LiteLLM Master Key      │  │
+│  └────────────┘   └────────────┘   │   - DB Credentials          │  │
+│                          ▲         │   - Model Config             │  │
+│                          │         └─────────────────────────────┘  │
+│                   EventBridge                                        │
+│                   (ASG Events)        ┌─────────────────────────┐   │
+│                                       │   AWS Budgets            │   │
+│                                       │   (Cost Alerts)          │   │
+│                                       └─────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## GPU Tiers
+## Features
 
-| Tier | Instance     | VRAM  | EBS Size | Use Case              |
-|------|-------------|-------|----------|------------------------|
-| 8gb  | g4dn.xlarge | 16GB  | 50GB     | 7B-13B models         |
-| 18gb | g5.xlarge   | 24GB  | 100GB    | 30B-70B models        |
-| 32gb | g5.4xlarge  | 48GB  | 200GB    | 70B+ quantized models |
+- **OpenWebUI**: Modern chat interface with conversation persistence
+- **LiteLLM**: Unified API proxy supporting multiple models via OpenRouter
+- **PostgreSQL RDS**: Persistent storage for conversations and settings
+- **Spot Instances**: Cost-effective compute with automatic EIP reassignment
+- **Auto Scaling Group**: Automatic instance recovery on spot termination
+- **Parameter Store**: Secure storage for API keys and configuration
+- **SSM Session Manager**: Secure shell access without SSH/keys
+- **AWS Budgets**: Cost monitoring with email alerts
+- **LangGraph/LangChain Ready**: LiteLLM exposed for agent frameworks
+
+## Cost Optimization
+
+This setup is designed to minimize costs:
+
+- **No SSH**: Uses SSM Session Manager (no bastion, no key management)
+- **Spot Instances**: ~70% cheaper than on-demand
+- **Smallest RDS**: db.t4g.micro (~$12/mo)
+- **No detailed monitoring**: Basic CloudWatch only
+- **No Performance Insights**: Disabled on RDS
+- **Minimal log retention**: 7 days for Lambda logs
+- **Budget alerts**: Get notified before overspending
+
+## Prerequisites
+
+1. AWS CLI configured with appropriate credentials
+2. Terraform >= 1.5.0
+3. OpenRouter API key
+4. Session Manager plugin (for instance access): https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
 
 ## Quick Start
 
-```bash
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars - set allowed_cidrs to your IP
+### 1. Clone and Configure
 
+```bash
+cd openwebui-litellm-infra
+
+# Copy example variables
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit with your values
+vim terraform.tfvars
+```
+
+### 2. Required Variables
+
+At minimum, you need to set:
+
+```hcl
+openrouter_api_key = "sk-or-v1-your-key-here"
+
+# For budget alerts
+budget_alert_emails = ["your-email@example.com"]
+```
+
+### 3. Deploy
+
+```bash
+# Initialize
 terraform init
+
+# Review the plan
+terraform plan
+
+# Apply
 terraform apply
 ```
 
-## Accessing Instances (SSM)
+### 4. Access Your Services
 
-No SSH required. Use AWS Systems Manager Session Manager:
-
-```bash
-# Get SSM commands for all instances
-terraform output ssm_connect_commands
-
-# Connect to controller
-aws ssm start-session --target $(terraform output -raw controller_instance_id)
-
-# Connect to GPU instance
-aws ssm start-session --target $(terraform output -json gpu_instances | jq -r '.["8gb"].instance_id')
-```
-
-## API Usage
+After deployment completes (5-10 minutes for RDS + instance bootstrap):
 
 ```bash
-LITELLM_KEY=$(terraform output -raw litellm_master_key)
-CONTROLLER=$(terraform output -raw controller_public_ip)
+# Get the outputs
+terraform output
 
-# Chat (auto-starts GPU if needed)
-curl http://$CONTROLLER:4000/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $LITELLM_KEY" \
-  -d '{"model": "ollama-8gb", "messages": [{"role": "user", "content": "Hello"}]}'
-
-# Start GPU manually
-curl -X POST "$(terraform output -raw start_instance_lambda_url)" \
-  -d '{"tier": "8gb", "wait_for_running": true}'
-```
-
-## Knowledge Base
-
-Enable with `enable_knowledge_base = true`. Includes collections for:
-
-- **supplements** - Examine.com supplement guides
-- **powerlifting_rules** - IPF/USAPL Technical Rules
-
-### Upload Documents to S3
-
-```bash
-S3_BUCKET=$(terraform output -json knowledge_base | jq -r '.s3_bucket')
-
-# Upload supplements
-aws s3 cp knowledge-base-documents/supplements/ s3://$S3_BUCKET/documents/supplements/ --recursive
-
-# Upload powerlifting rules
-aws s3 cp knowledge-base-documents/powerlifting_rules/ s3://$S3_BUCKET/documents/powerlifting_rules/ --recursive
-```
-
-### Ingest Documents
-
-```bash
-KB_IP=$(terraform output -json knowledge_base | jq -r '.private_ip')
-
-# Connect via SSM and run ingest
-aws ssm start-session --target $(terraform output -json knowledge_base | jq -r '.instance_id')
-
-# Inside the instance:
-curl -X POST http://localhost:8000/ingest -H "Content-Type: application/json" -d '{"collection": "supplements"}'
-curl -X POST http://localhost:8000/ingest -H "Content-Type: application/json" -d '{"collection": "powerlifting_rules"}'
-```
-
-### Query Knowledge Base
-
-```bash
-# Via Lambda
-LOOKUP_URL=$(terraform output -raw supplement_lookup_url)
-curl -X POST "$LOOKUP_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "creatine dosage timing", "collection": "supplements"}'
+# Get admin password
+aws ssm get-parameter \
+  --name "/openwebui-litellm/openwebui/admin_password" \
+  --with-decryption \
+  --query 'Parameter.Value' \
+  --output text
 ```
 
 ## Configuration
 
-### GPU Tiers Variable
+### Models
+
+Configure your models in `terraform.tfvars`:
 
 ```hcl
-gpu_tiers = {
-  "8gb" = {
-    instance_type = "g4dn.xlarge"
-    vram_gb       = 16
-    ebs_size_gb   = 50
-  }
-  "18gb" = {
-    instance_type = "g5.xlarge"
-    vram_gb       = 24
-    ebs_size_gb   = 100
-  }
-  "32gb" = {
-    instance_type = "g5.4xlarge"
-    vram_gb       = 48
-    ebs_size_gb   = 200
-  }
-}
+litellm_models = [
+  {
+    model_name       = "mistral-medium"    # Your alias
+    litellm_provider = "openrouter"
+    model_id         = "mistralai/mistral-medium"  # OpenRouter model ID
+  },
+  # Add more models...
+]
+
+default_model = "mistralai/mistral-medium"
 ```
 
-### Key Variables
+### Security
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `allowed_cidrs` | ["0.0.0.0/0"] | CIDRs allowed to access LiteLLM/OpenWebUI |
-| `max_uptime_minutes` | 30 | Auto-stop after this many minutes |
-| `enable_knowledge_base` | false | Enable RAG infrastructure |
-| `enable_functions` | false | Enable supplement_lookup Lambda |
+Restrict access by IP:
 
-## Cost Estimates (4 hours daily GPU usage)
+```hcl
+allowed_cidr_blocks = ["YOUR_IP/32"]
+```
 
-| Component | Instance | Hours/Month | Cost |
-|-----------|----------|-------------|------|
-| Controller | t3.micro | 720 | ~$8 |
-| 8GB Tier | g4dn.xlarge | 120 | ~$63 |
-| 18GB Tier | g5.xlarge | 120 | ~$120 |
-| 32GB Tier | g5.4xlarge | 120 | ~$240 |
-| Knowledge Base | t3.medium | 720 | ~$35 |
+### Cost Monitoring
+
+```hcl
+enable_budget_alerts  = true
+monthly_budget_amount = 50  # USD
+budget_alert_emails   = ["you@example.com"]
+```
+
+You'll receive alerts at 50%, 80%, 100% of budget, and when forecasted to exceed.
+
+### Instance Size
+
+For heavier workloads:
+
+```hcl
+instance_type    = "t3.large"  # or bigger
+root_volume_size = 50
+```
+
+## Instance Access (SSM Session Manager)
+
+No SSH keys needed. Access via AWS CLI or Console:
+
+```bash
+# Get instance ID
+INSTANCE_ID=$(aws autoscaling describe-auto-scaling-groups \
+  --auto-scaling-group-names openwebui-litellm-asg \
+  --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
+  --output text)
+
+# Start session
+aws ssm start-session --target $INSTANCE_ID
+
+# Or via AWS Console:
+# EC2 > Instances > Select instance > Connect > Session Manager
+```
+
+Once connected:
+
+```bash
+# View logs
+sudo docker compose -f /opt/ai-platform/docker-compose.yml logs -f
+
+# Restart services
+sudo docker compose -f /opt/ai-platform/docker-compose.yml restart
+
+# Check status
+sudo docker compose -f /opt/ai-platform/docker-compose.yml ps
+```
+
+## Using with LangGraph/LangChain
+
+```python
+from langchain_openai import ChatOpenAI
+
+# Get your LiteLLM master key from SSM or outputs
+LITELLM_KEY = "your-litellm-master-key"
+LITELLM_URL = "http://YOUR_EIP:4000/v1"
+
+llm = ChatOpenAI(
+    base_url=LITELLM_URL,
+    api_key=LITELLM_KEY,
+    model="mistral-medium"  # Use your model alias
+)
+
+response = llm.invoke("Hello!")
+print(response.content)
+```
+
+### LangGraph Example
+
+```python
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://YOUR_EIP:4000/v1",
+    api_key=LITELLM_KEY,
+    model="mistral-medium"
+)
+
+# Build your graph...
+```
+
+## Troubleshooting
+
+### Check Instance Logs
+
+```bash
+# Connect via SSM, then:
+cat /var/log/user-data.log
+sudo docker compose -f /opt/ai-platform/docker-compose.yml logs
+```
+
+### Check Service Health
+
+```bash
+# LiteLLM
+curl http://YOUR_EIP:4000/health
+
+# OpenWebUI
+curl http://YOUR_EIP:3000/health
+```
+
+### Database Connection
+
+```bash
+# Get connection string
+aws ssm get-parameter \
+  --name "/openwebui-litellm/db/connection_string" \
+  --with-decryption \
+  --query 'Parameter.Value' \
+  --output text
+```
+
+### Spot Instance Terminated
+
+The Lambda function automatically reassigns the EIP when a new spot instance launches. Check CloudWatch logs:
+
+```bash
+aws logs tail /aws/lambda/openwebui-litellm-eip-association --follow
+```
+
+## Costs
+
+Estimated monthly costs (us-east-1):
+
+| Resource | Type | Est. Cost |
+|----------|------|-----------|
+| EC2 Spot (t3.medium) | Spot | ~$10-15/mo |
+| RDS (db.t4g.micro) | On-demand | ~$12/mo |
+| EBS (30GB gp3) | Storage | ~$3/mo |
+| EIP | Allocated | $0 (attached) |
+| Data Transfer | Outbound | Variable |
+| **Total** | | **~$25-30/mo** |
+
+## Cleanup
+
+```bash
+terraform destroy
+```
+
+**Note**: RDS has deletion protection in prod. For dev, it's disabled.
+
+## Files Structure
+
+```
+openwebui-litellm-infra/
+├── versions.tf           # Provider configuration
+├── variables.tf          # Input variables
+├── vpc.tf                # VPC and networking
+├── security_groups.tf    # Security groups (no SSH)
+├── rds.tf                # PostgreSQL RDS
+├── parameter_store.tf    # SSM Parameters
+├── iam.tf                # IAM roles and policies
+├── launch_template.tf    # EC2 launch template
+├── asg.tf                # Auto Scaling Group
+├── eip.tf                # Elastic IP + Lambda
+├── cost_monitoring.tf    # AWS Budgets
+├── outputs.tf            # Output values
+├── terraform.tfvars.example
+├── templates/
+│   └── user_data.sh      # Instance bootstrap script
+└── README.md
+```
+
+## License
+
+MIT
