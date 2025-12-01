@@ -131,7 +131,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 120s
 
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
@@ -148,7 +148,7 @@ services:
       - DATABASE_URL=$DB_CONNECTION_STRING
       - WEBUI_AUTH=True
       - DEFAULT_MODELS=$DEFAULT_MODEL
-      - ENABLE_SIGNUP=false
+      - ENABLE_SIGNUP=true
       - WEBUI_NAME=AI Platform
     depends_on:
       litellm:
@@ -158,7 +158,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
 
 networks:
   default:
