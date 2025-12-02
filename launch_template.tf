@@ -19,17 +19,106 @@ data "aws_ami" "ubuntu" {
 # =============================================================================
 # User Data Template
 # =============================================================================
-data "template_file" "user_data" {
-  template = file("${path.module}/templates/user_data.sh")
+locals {
+  mcpo_api_key = random_password.mcpo_key.result
 
-  vars = {
-    project_name   = var.project_name
-    aws_region     = var.aws_region
+  mcpo_config = jsonencode({
+    mcpServers = {
+      aws = {
+        command = "docker"
+        args = [
+          "run", "-i", "--rm",
+          "-e", "AWS_PROFILE=default",
+          "-e", "AWS_REGION=${var.aws_region}",
+          "-v", "$HOME/.aws:/root/.aws:ro",
+          "alexei-led/aws-mcp-server:latest"
+        ]
+      }
+      azure = {
+        command = "npx"
+        args    = ["-y", "azure-cli-mcp"]
+      }
+      github = {
+        command = "npx"
+        args    = ["-y", "@modelcontextprotocol/server-github"]
+        env = {
+          GITHUB_PERSONAL_ACCESS_TOKEN = var.github_token
+        }
+      }
+      kubernetes = {
+        command = "docker"
+        args = [
+          "run", "-i", "--rm",
+          "-v", "$HOME/.kube:/root/.kube:ro",
+          "rohitg00/kubectl-mcp-server:latest"
+        ]
+      }
+      docker = {
+        command = "npx"
+        args    = ["-y", "@modelcontextprotocol/server-docker"]
+      }
+      terraform = {
+        command = "docker"
+        args = [
+          "run", "-i", "--rm",
+          "hashicorp/terraform-mcp-server:latest"
+        ]
+      }
+      google-maps = {
+        command = "npx"
+        args    = ["-y", "mcp-server-google-maps"]
+        env = {
+          GOOGLE_MAPS_API_KEY = var.google_maps_api_key
+        }
+      }
+      time = {
+        command = "uvx"
+        args    = ["mcp-server-time", "--local-timezone=America/Toronto"]
+      }
+      wikipedia = {
+        command = "npx"
+        args    = ["-y", "@modelcontextprotocol/server-wikipedia"]
+      }
+      youtube = {
+        command = "npx"
+        args    = ["-y", "mcp-youtube-transcript"]
+      }
+      memory = {
+        command = "npx"
+        args    = ["-y", "@modelcontextprotocol/server-memory"]
+      }
+      filesystem = {
+        command = "npx"
+        args    = ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+      }
+    }
+  })
+
+  docker_compose_content = templatefile("${path.module}/templates/docker-compose.yml.tpl", {
     openwebui_port = var.openwebui_port
     litellm_port   = var.litellm_port
-  }
+    default_model  = var.default_model
+    mcpo_api_key   = local.mcpo_api_key
+  })
+
+  user_data = templatefile("${path.module}/templates/user_data.sh", {
+    project_name           = var.project_name
+    aws_region             = var.aws_region
+    docker_compose_content = local.docker_compose_content
+    mcpo_config_content    = local.mcpo_config
+    mcpo_api_key           = local.mcpo_api_key
+  })
 }
 
+resource "random_password" "mcpo_key" {
+  length  = 32
+  special = false
+}
+
+output "mcpo_api_key" {
+  value     = random_password.mcpo_key.result
+  sensitive = true
+}
 # =============================================================================
 # Launch Template
 # =============================================================================
@@ -79,7 +168,7 @@ resource "aws_launch_template" "main" {
   }
 
   # User data
-  user_data = base64encode(data.template_file.user_data.rendered)
+  user_data = base64encode(local.user_data)
 
   # Instance tags
   tag_specifications {

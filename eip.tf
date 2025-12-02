@@ -94,11 +94,11 @@ resource "aws_lambda_function" "eip_association" {
 }
 
 # =============================================================================
-# CloudWatch Log Group for Lambda (minimal retention)
+# CloudWatch Log Group for Lambda
 # =============================================================================
 resource "aws_cloudwatch_log_group" "lambda_eip" {
   name              = "/aws/lambda/${aws_lambda_function.eip_association.function_name}"
-  retention_in_days = 7
+  retention_in_days = 14
 
   tags = {
     Name = "${var.project_name}-lambda-logs"

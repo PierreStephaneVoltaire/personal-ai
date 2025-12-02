@@ -34,10 +34,7 @@ A Terraform-managed infrastructure for deploying OpenWebUI with LiteLLM as a pro
 │                          ▲         │   - Model Config             │  │
 │                          │         └─────────────────────────────┘  │
 │                   EventBridge                                        │
-│                   (ASG Events)        ┌─────────────────────────┐   │
-│                                       │   AWS Budgets            │   │
-│                                       │   (Cost Alerts)          │   │
-│                                       └─────────────────────────┘   │
+│                   (ASG Events)                                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -49,28 +46,13 @@ A Terraform-managed infrastructure for deploying OpenWebUI with LiteLLM as a pro
 - **Spot Instances**: Cost-effective compute with automatic EIP reassignment
 - **Auto Scaling Group**: Automatic instance recovery on spot termination
 - **Parameter Store**: Secure storage for API keys and configuration
-- **SSM Session Manager**: Secure shell access without SSH/keys
-- **AWS Budgets**: Cost monitoring with email alerts
 - **LangGraph/LangChain Ready**: LiteLLM exposed for agent frameworks
-
-## Cost Optimization
-
-This setup is designed to minimize costs:
-
-- **No SSH**: Uses SSM Session Manager (no bastion, no key management)
-- **Spot Instances**: ~70% cheaper than on-demand
-- **Smallest RDS**: db.t4g.micro (~$12/mo)
-- **No detailed monitoring**: Basic CloudWatch only
-- **No Performance Insights**: Disabled on RDS
-- **Minimal log retention**: 7 days for Lambda logs
-- **Budget alerts**: Get notified before overspending
 
 ## Prerequisites
 
 1. AWS CLI configured with appropriate credentials
 2. Terraform >= 1.5.0
 3. OpenRouter API key
-4. Session Manager plugin (for instance access): https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
 
 ## Quick Start
 
@@ -92,9 +74,6 @@ At minimum, you need to set:
 
 ```hcl
 openrouter_api_key = "sk-or-v1-your-key-here"
-
-# For budget alerts
-budget_alert_emails = ["your-email@example.com"]
 ```
 
 ### 3. Deploy
@@ -153,16 +132,6 @@ Restrict access by IP:
 allowed_cidr_blocks = ["YOUR_IP/32"]
 ```
 
-### Cost Monitoring
-
-```hcl
-enable_budget_alerts  = true
-monthly_budget_amount = 50  # USD
-budget_alert_emails   = ["you@example.com"]
-```
-
-You'll receive alerts at 50%, 80%, 100% of budget, and when forecasted to exceed.
-
 ### Instance Size
 
 For heavier workloads:
@@ -170,37 +139,6 @@ For heavier workloads:
 ```hcl
 instance_type    = "t3.large"  # or bigger
 root_volume_size = 50
-```
-
-## Instance Access (SSM Session Manager)
-
-No SSH keys needed. Access via AWS CLI or Console:
-
-```bash
-# Get instance ID
-INSTANCE_ID=$(aws autoscaling describe-auto-scaling-groups \
-  --auto-scaling-group-names openwebui-litellm-asg \
-  --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
-  --output text)
-
-# Start session
-aws ssm start-session --target $INSTANCE_ID
-
-# Or via AWS Console:
-# EC2 > Instances > Select instance > Connect > Session Manager
-```
-
-Once connected:
-
-```bash
-# View logs
-sudo docker compose -f /opt/ai-platform/docker-compose.yml logs -f
-
-# Restart services
-sudo docker compose -f /opt/ai-platform/docker-compose.yml restart
-
-# Check status
-sudo docker compose -f /opt/ai-platform/docker-compose.yml ps
 ```
 
 ## Using with LangGraph/LangChain
@@ -237,14 +175,29 @@ llm = ChatOpenAI(
 # Build your graph...
 ```
 
+## SSH Access
+
+If you provided an EC2 key pair:
+
+```bash
+ssh -i your-key.pem ubuntu@<ELASTIC_IP>
+
+# View logs
+cd /opt/ai-platform
+docker compose logs -f
+
+# Restart services
+docker compose restart
+```
+
 ## Troubleshooting
 
 ### Check Instance Logs
 
 ```bash
-# Connect via SSM, then:
+# SSH to instance, then:
 cat /var/log/user-data.log
-sudo docker compose -f /opt/ai-platform/docker-compose.yml logs
+docker compose -f /opt/ai-platform/docker-compose.yml logs
 ```
 
 ### Check Service Health
@@ -304,14 +257,13 @@ openwebui-litellm-infra/
 ├── versions.tf           # Provider configuration
 ├── variables.tf          # Input variables
 ├── vpc.tf                # VPC and networking
-├── security_groups.tf    # Security groups (no SSH)
+├── security_groups.tf    # Security groups
 ├── rds.tf                # PostgreSQL RDS
 ├── parameter_store.tf    # SSM Parameters
 ├── iam.tf                # IAM roles and policies
 ├── launch_template.tf    # EC2 launch template
 ├── asg.tf                # Auto Scaling Group
 ├── eip.tf                # Elastic IP + Lambda
-├── cost_monitoring.tf    # AWS Budgets
 ├── outputs.tf            # Output values
 ├── terraform.tfvars.example
 ├── templates/

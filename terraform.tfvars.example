@@ -1,0 +1,79 @@
+# =============================================================================
+# Example Terraform Variables
+# Copy this file to terraform.tfvars and fill in your values
+# =============================================================================
+
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "dev"
+project_name = "openwebui-litellm"
+
+# Networking - Restrict access (use your IP)
+# For open access: ["0.0.0.0/0"]
+# For restricted: ["YOUR_IP/32"]
+allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# EC2 Configuration
+instance_type    = "t3.medium"  # Adjust based on workload
+root_volume_size = 30
+key_name         = ""  # Optional: your EC2 key pair name for SSH
+
+# Spot pricing (empty = use on-demand as max)
+spot_max_price = ""
+
+# RDS Configuration (smallest possible)
+db_instance_class    = "db.t4g.micro"
+db_allocated_storage = 20
+
+# =============================================================================
+# REQUIRED: OpenRouter Configuration
+# =============================================================================
+openrouter_api_key = "sk-or-v1-your-openrouter-api-key-here"
+
+# =============================================================================
+# LiteLLM Configuration
+# =============================================================================
+# Leave empty to auto-generate
+litellm_master_key = ""
+
+# Models to expose through LiteLLM
+# Format: model_name (your alias), litellm_provider, model_id (OpenRouter model)
+litellm_models = [
+  {
+    model_name       = "mistral-medium"
+    litellm_provider = "openrouter"
+    model_id         = "mistralai/mistral-medium"
+  },
+  {
+    model_name       = "claude-3-sonnet"
+    litellm_provider = "openrouter"
+    model_id         = "anthropic/claude-3-sonnet"
+  },
+  {
+    model_name       = "gpt-4-turbo"
+    litellm_provider = "openrouter"
+    model_id         = "openai/gpt-4-turbo"
+  },
+  {
+    model_name       = "llama-3-70b"
+    litellm_provider = "openrouter"
+    model_id         = "meta-llama/llama-3-70b-instruct"
+  }
+]
+
+# Default model (should match one of your model_id values)
+default_model = "mistralai/mistral-medium"
+
+# System prompt
+system_prompt = "You are a helpful AI assistant."
+
+# =============================================================================
+# OpenWebUI Configuration
+# =============================================================================
+openwebui_admin_email    = "admin@example.com"
+openwebui_admin_password = ""  # Leave empty to auto-generate
+openwebui_admin_name     = "Admin"
+
+# Service ports
+openwebui_port = 3000
+litellm_port   = 4000

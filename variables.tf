@@ -46,7 +46,7 @@ variable "allowed_cidr_blocks" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.medium"
+  default     = "c5.large"
 }
 
 variable "spot_max_price" {
@@ -213,3 +213,18 @@ variable "litellm_port" {
   type        = number
   default     = 4000
 }
+
+variable "github_token" {
+  description = "GitHub Personal Access Token"
+  type        = string
+  sensitive   = true
+}
+
+variable "google_maps_api_key" {
+  description = "Google Maps API Key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+
