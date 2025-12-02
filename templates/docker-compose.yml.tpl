@@ -54,7 +54,10 @@ services:
       - DATABASE_URL=$${DB_CONNECTION_STRING}
       - WEBUI_AUTH=True
       - DEFAULT_MODELS=${default_model}
+      - DOCKER=true
       - ENABLE_SIGNUP=true
+      - ENABLE_SIGNUP_PASSWORD_CONFIRMATION=true
+      - ENABLE_REALTIME_CHAT_SAVE=true
       - WEBUI_NAME=AI Platform
       - CONTENT_EXTRACTION_ENGINE=tika
       - TIKA_SERVER_URL=http://tika:9998/tika
@@ -69,4 +72,4 @@ services:
 
 networks:
   default:
-    name: ai-platform-network
+    name: ${project_name}-network

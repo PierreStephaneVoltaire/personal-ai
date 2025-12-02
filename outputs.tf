@@ -160,7 +160,7 @@ output "usage_instructions" {
     
     VIEW LOGS (after SSM session):
     ------------------------------
-    sudo docker compose -f /opt/ai-platform/docker-compose.yml logs -f
+    sudo docker compose -f /opt/${var.project_name}/docker-compose.yml logs -f
     
     COST MONITORING:
     ----------------

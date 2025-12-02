@@ -102,6 +102,7 @@ locals {
     s3_bucket_name = var.s3_bucket_name
     s3_key_prefix  = var.s3_key_prefix
     aws_region     = var.aws_region
+    project_name = var.project_name
   })
 
   user_data = templatefile("${path.module}/templates/user_data.sh", {
@@ -194,6 +195,7 @@ resource "aws_launch_template" "main" {
 
   # Ensure dependencies are met
   depends_on = [
+    aws_s3_bucket.openwebui,
     aws_db_instance.postgres,
     aws_ssm_parameter.db_connection_string,
     aws_ssm_parameter.openrouter_api_key,

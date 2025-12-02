@@ -34,7 +34,7 @@ systemctl start docker
 # Create directories
 echo "=== Creating directories ==="
 mkdir -p /opt/${project_name}/{mcpo,litellm,openwebui/data,workspace}
-cd /opt/ai-platform
+cd /opt/${project_name}
 
 # Fetch SSM parameters
 echo "=== Fetching SSM parameters ==="
@@ -61,7 +61,7 @@ MCPO_CONFIG
 
 # Generate LiteLLM config
 echo "=== Generating LiteLLM config ==="
-cat > /opt/ai-platform/litellm/config.yaml << 'EOF'
+cat > /opt/${project_name}/litellm/config.yaml << 'EOF'
 model_list:
 EOF
 
@@ -69,7 +69,7 @@ echo "$LITELLM_MODELS" | jq -c '.[]' | while read -r model; do
     model_name=$(echo "$model" | jq -r '.model_name')
     model_id=$(echo "$model" | jq -r '.model_id')
     
-    cat >> /opt/ai-platform/litellm/config.yaml << MODELEOF
+    cat >> /opt/${project_name}/litellm/config.yaml << MODELEOF
   - model_name: $model_name
     litellm_params:
       model: openrouter/$model_id
@@ -79,7 +79,7 @@ MODELEOF
 done
 
 # Add system prompt to litellm settings
-cat >> /opt/ai-platform/litellm/config.yaml << EOF
+cat >> /opt/${project_name}/litellm/config.yaml << EOF
 
 litellm_settings:
   drop_params: true
@@ -92,27 +92,27 @@ general_settings:
 EOF
 
 echo "=== LiteLLM config ==="
-cat /opt/ai-platform/litellm/config.yaml
+cat /opt/${project_name}/litellm/config.yaml
 
 # Write docker-compose from template
 echo "=== Writing docker-compose.yml ==="
-cat > /opt/ai-platform/docker-compose.yml << 'DOCKEREOF'
+cat > /opt/${project_name}/docker-compose.yml << 'DOCKEREOF'
 ${docker_compose_content}
 DOCKEREOF
 
 # Substitute environment variables
-envsubst < /opt/ai-platform/docker-compose.yml > /opt/ai-platform/docker-compose.yml.tmp
-mv /opt/ai-platform/docker-compose.yml.tmp /opt/ai-platform/docker-compose.yml
+envsubst < /opt/${project_name}/docker-compose.yml > /opt/${project_name}/docker-compose.yml.tmp
+mv /opt/${project_name}/docker-compose.yml.tmp /opt/${project_name}/docker-compose.yml
 
 echo "=== docker-compose.yml ==="
-cat /opt/ai-platform/docker-compose.yml
+cat /opt/${project_name}/docker-compose.yml
 
 # Start services
 echo "=== Starting services ==="
 docker compose up -d
 
 # Systemd service
-cat > /etc/systemd/system/ai-platform.service << EOF
+cat > /etc/systemd/system/${project_name}.service << EOF
 [Unit]
 Description=AI Platform (OpenWebUI + LiteLLM)
 Requires=docker.service
@@ -121,7 +121,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/ai-platform
+WorkingDirectory=/opt/${project_name}
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=0
@@ -131,7 +131,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable ai-platform.service
+systemctl enable ${project_name}.service
 
 echo "=== Bootstrap complete ==="
 docker compose ps

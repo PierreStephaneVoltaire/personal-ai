@@ -183,7 +183,7 @@ If you provided an EC2 key pair:
 ssh -i your-key.pem ubuntu@<ELASTIC_IP>
 
 # View logs
-cd /opt/ai-platform
+cd /opt/${project_name}
 docker compose logs -f
 
 # Restart services
@@ -197,7 +197,7 @@ docker compose restart
 ```bash
 # SSH to instance, then:
 cat /var/log/user-data.log
-docker compose -f /opt/ai-platform/docker-compose.yml logs
+docker compose -f /opt/${project_name}/docker-compose.yml logs
 ```
 
 ### Check Service Health
