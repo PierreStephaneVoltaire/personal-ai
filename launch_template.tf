@@ -99,6 +99,9 @@ locals {
     litellm_port   = var.litellm_port
     default_model  = var.default_model
     mcpo_api_key   = local.mcpo_api_key
+    s3_bucket_name = var.s3_bucket_name
+    s3_key_prefix  = var.s3_key_prefix
+    aws_region     = var.aws_region
   })
 
   user_data = templatefile("${path.module}/templates/user_data.sh", {
