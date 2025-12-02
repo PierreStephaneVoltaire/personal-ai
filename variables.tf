@@ -228,3 +228,16 @@ variable "google_maps_api_key" {
 }
 
 
+# =============================================================================
+# S3 Storage Configuration
+# =============================================================================
+variable "s3_bucket_name" {
+  description = "S3 bucket name for OpenWebUI file storage (enables persistence across spot terminations)"
+  type        = string
+}
+
+variable "s3_key_prefix" {
+  description = "S3 key prefix for organizing files within the bucket"
+  type        = string
+  default     = "openwebui/"
+}
