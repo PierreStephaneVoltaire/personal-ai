@@ -60,7 +60,7 @@ services:
       - ENABLE_REALTIME_CHAT_SAVE=true
       - WEBUI_NAME=AI Platform
       - CONTENT_EXTRACTION_ENGINE=tika
-      - TIKA_SERVER_URL=http://tika:9998/tika
+      - TIKA_SERVER_URL=http://tika:9998
       - STORAGE_PROVIDER=s3
       - S3_BUCKET_NAME=${s3_bucket_name}
       - S3_REGION_NAME=${aws_region}
