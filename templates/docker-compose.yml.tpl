@@ -65,6 +65,10 @@ services:
       - S3_BUCKET_NAME=${s3_bucket_name}
       - S3_REGION_NAME=${aws_region}
       - S3_KEY_PREFIX=${s3_key_prefix}
+      - VECTOR_DB=pgvector
+      - ENABLE_DIRECT_CONNECTIONS=true
+      - TOOL_SERVER_CONNECTIONS=[{"type":"openapi","url":"http://mcpo:8000","auth_type":"bearer","key":"${mcpo_api_key}","config":{"enable":true},"info":{"name":"MCP Tools"}}]
+
     depends_on:
       - litellm
       - tika
