@@ -266,7 +266,7 @@ mkdir -p /opt/rancher/ssl
   --server zerossl \
   --eab-kid "${var.zerossl_eab_kid}" \
   --eab-hmac-key "${var.zerossl_eab_hmac_key}" \
-  --force --debug
+   --debug || echo true
 
 
 /root/.acme.sh/acme.sh --install-cert --domain rancher.${var.domain_name} \

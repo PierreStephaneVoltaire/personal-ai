@@ -26,10 +26,9 @@ resource "rancher2_cloud_credential" "aws" {
   depends_on = [rancher2_bootstrap.admin]
 }
 
-data "rancher2_cluster_v2" "main" {
+data "rancher2_cluster" "main" {
   name = "local"
   depends_on = [rancher2_bootstrap.admin]
-
 }
 
 
