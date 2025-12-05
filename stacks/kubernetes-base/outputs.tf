@@ -1,12 +1,9 @@
-output "namespace" {
-  value = kubernetes_namespace.ai_platform.metadata[0].name
+output "cert_manager_namespace" {
+  description = "Cert-manager namespace"
+  value       = helm_release.cert_manager.namespace
 }
 
-output "argocd_namespace" {
-  value = var.stopped ? null : helm_release.argocd[0].namespace
-}
-
-output "litellm_master_key" {
-  value     = random_password.litellm_master_key.result
-  sensitive = true
+output "nginx_gateway_namespace" {
+  description = "Nginx gateway namespace"
+  value       = helm_release.nginx_gateway_fabric.namespace
 }

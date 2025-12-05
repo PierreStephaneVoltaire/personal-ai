@@ -1,96 +1,3 @@
-locals {
-  cluster_name = "${var.project_name}-${var.environment}"
-}
-
-resource "kubernetes_namespace" "ai_platform" {
-  metadata {
-    name = "ai-platform"
-    labels = {
-      name        = "ai-platform"
-      environment = var.environment
-    }
-  }
-}
-
-resource "random_password" "litellm_master_key" {
-  length  = 32
-  special = false
-}
-
-resource "random_password" "webui_secret_key" {
-  length  = 32
-  special = false
-}
-
-resource "random_password" "mcpo_api_key" {
-  length  = 32
-  special = false
-}
-
-resource "kubernetes_secret" "ai_platform_secrets" {
-  metadata {
-    name      = "ai-platform-secrets"
-    namespace = kubernetes_namespace.ai_platform.metadata[0].name
-  }
-
-  data = {
-    LITELLM_MASTER_KEY = random_password.litellm_master_key.result
-    OPENROUTER_API_KEY = var.openrouter_api_key
-    WEBUI_SECRET_KEY   = random_password.webui_secret_key.result
-    MCPO_API_KEY       = random_password.mcpo_api_key.result
-    DATABASE_URL       = data.terraform_remote_state.base.outputs.db_connection_string
-  }
-
-  type = "Opaque"
-}
-
-resource "kubernetes_config_map" "litellm_config" {
-  metadata {
-    name      = "litellm-config"
-    namespace = kubernetes_namespace.ai_platform.metadata[0].name
-  }
-
-  data = {
-    "config.yaml" = yamlencode({
-      model_list = [
-        for model in var.litellm_models : {
-          model_name = model.model_name
-          litellm_params = {
-            model    = "openrouter/${model.model_id}"
-            api_base = "https://openrouter.ai/api/v1"
-            api_key  = "os.environ/OPENROUTER_API_KEY"
-          }
-        }
-      ]
-      general_settings = {
-        master_key = "os.environ/LITELLM_MASTER_KEY"
-      }
-    })
-  }
-}
-
-resource "kubernetes_config_map" "mcpo_config" {
-  metadata {
-    name      = "mcpo-config"
-    namespace = kubernetes_namespace.ai_platform.metadata[0].name
-  }
-
-  data = {
-    "config.json" = jsonencode({
-      mcpServers = {
-        time = {
-          command = "uvx"
-          args    = ["mcp-server-time", "--local-timezone", var.timezone]
-        }
-        memory = {
-          command = "npx"
-          args    = ["-y", "@modelcontextprotocol/server-memory"]
-        }
-      }
-    })
-  }
-}
-
 resource "helm_release" "cert_manager" {
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
@@ -103,8 +10,14 @@ resource "helm_release" "cert_manager" {
     yamlencode({
       installCRDs = true
       resources = {
-        requests = { cpu = "50m", memory = "128Mi" }
-        limits   = { cpu = "100m", memory = "256Mi" }
+        requests = {
+          cpu    = "50m"
+          memory = "128Mi"
+        }
+        limits = {
+          cpu    = "100m"
+          memory = "256Mi"
+        }
       }
     })
   ]
@@ -120,14 +33,24 @@ resource "helm_release" "external_dns" {
   values = [
     yamlencode({
       provider      = "aws"
-      domainFilters = [data.terraform_remote_state.base.outputs.domain_name]
+      domainFilters = [var.domain_name]
       policy        = "sync"
       registry      = "txt"
       txtOwnerId    = local.cluster_name
       interval      = "1m"
       resources = {
-        requests = { cpu = "50m", memory = "64Mi" }
-        limits   = { cpu = "100m", memory = "128Mi" }
+        requests = {
+          cpu    = "50m"
+          memory = "64Mi"
+        }
+        limits = {
+          cpu    = "100m"
+          memory = "128Mi"
+        }
+      }
+      serviceAccount = {
+        create      = true
+        annotations = {}
       }
     })
   ]
@@ -135,17 +58,26 @@ resource "helm_release" "external_dns" {
   depends_on = [helm_release.cert_manager]
 }
 
+
+data "http" "gateway_api_crds" {
+  url = "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml"
+}
+
+data "kubectl_file_documents" "gateway_api_crds" {
+  content = data.http.gateway_api_crds.response_body
+}
+
 resource "kubectl_manifest" "gateway_api_crds" {
-  count             = var.stopped ? 0 : length(data.kubectl_file_documents.gateway_api_crds.documents)
+    count             =  length(data.kubectl_file_documents.gateway_api_crds.documents)
+
   yaml_body         = element(data.kubectl_file_documents.gateway_api_crds.documents, count.index)
   server_side_apply = true
+  force_conflicts = true
 }
 
 resource "helm_release" "nginx_gateway_fabric" {
-  count = var.stopped ? 0 : 1
-
   name             = "nginx-gateway-fabric"
-  repository       = "oci://ghcr.io/nginxinc/charts"
+  repository       = "oci://ghcr.io/nginx/charts"
   chart            = "nginx-gateway-fabric"
   namespace        = "nginx-gateway"
   create_namespace = true
@@ -154,20 +86,26 @@ resource "helm_release" "nginx_gateway_fabric" {
   values = [
     yamlencode({
       nginxGateway = {
-        gatewayClassName = "nginx"
+        config = {
+          logging = {
+            level = "debug"
+          }
+        }
       }
       nginx = {
         config = {
           entries = [
+            { name = "proxy_intercept_errors", value = "off" },
+            { name = "proxy_connect_timeout", value = "60s" },
+            { name = "proxy_send_timeout", value = "60s" },
+            { name = "proxy_read_timeout", value = "60s" },
             { name = "client_max_body_size", value = "100m" }
           ]
         }
-        resources = {
-          requests = { cpu = "100m", memory = "128Mi" }
-          limits   = { cpu = "200m", memory = "256Mi" }
+        service = {
+          type = "LoadBalancer"
         }
       }
-      service = { type = "LoadBalancer" }
     })
   ]
 
@@ -175,7 +113,6 @@ resource "helm_release" "nginx_gateway_fabric" {
 }
 
 resource "kubectl_manifest" "nginx_gateway" {
-  count = var.stopped ? 0 : 1
 
   yaml_body = yamlencode({
     apiVersion = "gateway.networking.k8s.io/v1"
@@ -184,7 +121,7 @@ resource "kubectl_manifest" "nginx_gateway" {
       name      = "nginx-gateway"
       namespace = "nginx-gateway"
       annotations = {
-        "cert-manager.io/cluster-issuer" = "letsencrypt-prod"
+        "cert-manager.io/cluster-issuer" = "zerossl-prod"
       }
     }
     spec = {
@@ -194,17 +131,27 @@ resource "kubectl_manifest" "nginx_gateway" {
           name     = "http"
           port     = 80
           protocol = "HTTP"
-          allowedRoutes = { namespaces = { from = "All" } }
+          allowedRoutes = {
+            namespaces = { from = "All" }
+          }
         },
         {
           name     = "https"
           port     = 443
           protocol = "HTTPS"
           tls = {
-            mode            = "Terminate"
-            certificateRefs = [{ kind = "Secret", name = "wildcard-tls", namespace = "ai-platform" }]
+            mode = "Terminate"
+            certificateRefs = [
+              {
+                kind      = "Secret"
+                name      = "wildcard-tls"
+                namespace = "app"
+              }
+            ]
           }
-          allowedRoutes = { namespaces = { from = "All" } }
+          allowedRoutes = {
+            namespaces = { from = "All" }
+          }
         }
       ]
     }
@@ -213,33 +160,64 @@ resource "kubectl_manifest" "nginx_gateway" {
   depends_on = [helm_release.nginx_gateway_fabric]
 }
 
-resource "kubectl_manifest" "letsencrypt_prod" {
+resource "kubernetes_secret" "zerossl_eab" {
+  metadata {
+    name      = "zerossl-eab"
+    namespace = "cert-manager"
+  }
+
+  data = {
+    secret = var.zerossl_eab_hmac_key
+  }
+
+  type = "Opaque"
+
+  depends_on = [helm_release.cert_manager]
+}
+
+resource "kubectl_manifest" "zerossl_prod" {
   yaml_body = yamlencode({
     apiVersion = "cert-manager.io/v1"
     kind       = "ClusterIssuer"
-    metadata   = { name = "letsencrypt-prod" }
+    metadata = {
+      name = "zerossl-prod"
+    }
     spec = {
       acme = {
-        server = "https://acme-v02.api.letsencrypt.org/directory"
-        email  = "admin@${data.terraform_remote_state.base.outputs.domain_name}"
-        privateKeySecretRef = { name = "letsencrypt-prod" }
-        solvers = [{
-          http01 = {
-            gatewayHTTPRoute = {
-              parentRefs = [{
-                name        = "nginx-gateway"
-                namespace   = "nginx-gateway"
-                kind        = "Gateway"
-                sectionName = "http"
-              }]
+        server = "https://acme.zerossl.com/v2/DV90"
+        email  = "admin@${var.domain_name}"
+        externalAccountBinding = {
+          keyID = var.zerossl_eab_kid
+          keySecretRef = {
+            name = kubernetes_secret.zerossl_eab.metadata[0].name
+            key  = "secret"
+          }
+          keyAlgorithm = "HS256"
+        }
+        privateKeySecretRef = {
+          name = "zerossl-prod"
+        }
+        solvers = [
+          {
+            http01 = {
+              gatewayHTTPRoute = {
+                parentRefs = [
+                  {
+                    name        = "nginx-gateway"
+                    namespace   = "nginx-gateway"
+                    kind        = "Gateway"
+                    sectionName = "http"
+                  }
+                ]
+              }
             }
           }
-        }]
+        ]
       }
     }
   })
 
-  depends_on = [helm_release.cert_manager, helm_release.nginx_gateway_fabric]
+  depends_on = [helm_release.cert_manager, helm_release.nginx_gateway_fabric, kubernetes_secret.zerossl_eab]
 }
 
 resource "kubectl_manifest" "cert_reference_grant" {
@@ -250,84 +228,45 @@ resource "kubectl_manifest" "cert_reference_grant" {
     kind       = "ReferenceGrant"
     metadata = {
       name      = "allow-nginx-gateway-cert"
-      namespace = "ai-platform"
+      namespace = "app"
     }
     spec = {
-      from = [{ group = "gateway.networking.k8s.io", kind = "Gateway", namespace = "nginx-gateway" }]
-      to   = [{ group = "", kind = "Secret" }]
+      from = [
+        {
+          group     = "gateway.networking.k8s.io"
+          kind      = "Gateway"
+          namespace = "nginx-gateway"
+        }
+      ]
+      to = [
+        {
+          group = ""
+          kind  = "Secret"
+        }
+      ]
     }
   })
 
-  depends_on = [helm_release.nginx_gateway_fabric, kubernetes_namespace.ai_platform]
+  depends_on = [helm_release.nginx_gateway_fabric]
 }
 
 data "kubernetes_service" "nginx_gateway" {
-  count = var.stopped ? 0 : 1
-
   metadata {
     name      = "nginx-gateway-fabric"
     namespace = "nginx-gateway"
   }
 
-  depends_on = [helm_release.nginx_gateway_fabric]
+  depends_on = [kubectl_manifest.nginx_gateway]
 }
 
-resource "aws_route53_record" "wildcard" {
-  count   = var.stopped ? 0 : 1
+data "aws_route53_zone" "main" {
+  name = var.domain_name
+}
+
+resource "aws_route53_record" "cluster_wildcard" {
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = "*.${data.terraform_remote_state.base.outputs.domain_name}"
+  name    = "*.${var.domain_name}"
   type    = "A"
   ttl     = 300
   records = [data.kubernetes_service.nginx_gateway[0].status[0].load_balancer[0].ingress[0].ip]
-}
-
-resource "helm_release" "argocd" {
-  count = var.stopped ? 0 : 1
-
-  name          = "argocd"
-  repository    = "https://argoproj.github.io/argo-helm"
-  chart         = "argo-cd"
-  version       = "v9.0.5"
-  namespace     = "argocd"
-  create_namespace = true
-  wait          = true
-  timeout       = 600
-
-  set {
-    name  = "configs.params.server\\.insecure"
-    value = "true"
-  }
-
-  set {
-    name  = "configs.cm.kustomize\\.buildOptions"
-    value = "--load-restrictor LoadRestrictionsNone"
-  }
-
-  set {
-    name  = "global.domain"
-    value = "argocd.${data.terraform_remote_state.base.outputs.domain_name}"
-  }
-}
-
-resource "kubectl_manifest" "argocd_httproute" {
-  count = var.stopped ? 0 : 1
-
-  yaml_body = yamlencode({
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "HTTPRoute"
-    metadata = {
-      name      = "argocd-route"
-      namespace = "argocd"
-    }
-    spec = {
-      parentRefs = [{ name = "nginx-gateway", namespace = "nginx-gateway", sectionName = "https" }]
-      hostnames  = ["argocd.${data.terraform_remote_state.base.outputs.domain_name}"]
-      rules = [{
-        matches     = [{ path = { type = "PathPrefix", value = "/" } }]
-        backendRefs = [{ name = "argocd-server", port = 80 }]
-      }]
-    }
-  })
-
-  depends_on = [helm_release.argocd]
 }

@@ -12,6 +12,9 @@ variable "environment" {
   type    = string
   default = "dev"
 }
+variable "domain_name" {
+  type = string
+}
 
 variable "openrouter_api_key" {
   type      = string
@@ -34,4 +37,16 @@ variable "litellm_models" {
 variable "stopped" {
   type    = bool
   default = false
+}
+
+variable "zerossl_eab_kid" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "zerossl_eab_hmac_key" {
+  type      = string
+  sensitive = true
+  default   = ""
 }
