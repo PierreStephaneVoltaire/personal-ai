@@ -1,24 +1,21 @@
-# =============================================================================
-# S3 Bucket for OpenWebUI File Storage
-# =============================================================================
-resource "aws_s3_bucket" "openwebui" {
-  bucket = var.s3_bucket_name
+resource "aws_s3_bucket" "ai_storage" {
+  bucket = "pv-ai-bucket"
 
   tags = {
-    Name        = "${var.project_name}-storage"
-    Environment = var.environment
+    Name = "${local.cluster_name}-storage"
   }
 }
 
-resource "aws_s3_bucket_versioning" "openwebui" {
-  bucket = aws_s3_bucket.openwebui.id
+resource "aws_s3_bucket_versioning" "ai_storage" {
+  bucket = aws_s3_bucket.ai_storage.id
+
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "openwebui" {
-  bucket = aws_s3_bucket.openwebui.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "ai_storage" {
+  bucket = aws_s3_bucket.ai_storage.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -27,11 +24,24 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "openwebui" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "openwebui" {
-  bucket = aws_s3_bucket.openwebui.id
+resource "aws_s3_bucket_public_access_block" "ai_storage" {
+  bucket = aws_s3_bucket.ai_storage.id
 
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "ai_storage" {
+  bucket = aws_s3_bucket.ai_storage.id
+
+  rule {
+    id     = "cleanup-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
 }

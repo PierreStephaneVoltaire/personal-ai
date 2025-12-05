@@ -1,71 +1,67 @@
 # =============================================================================
-# Example Terraform Variables
-# Copy this file to terraform.tfvars and fill in your values
+# AI Platform on k3s - Configuration
+# Copy to terraform.tfvars and fill in your values
 # =============================================================================
 
 # AWS Configuration
-aws_region  = "us-east-1"
-environment = "dev"
-project_name = "openwebui-litellm"
+aws_region   = "ca-central-1"
+environment  = "dev"
+project_name = "ai-platform"
 
-# Networking - Restrict access (use your IP)
-# For open access: ["0.0.0.0/0"]
-# For restricted: ["YOUR_IP/32"]
-allowed_cidr_blocks = ["0.0.0.0/0"]
+# Domain for TLS (optional but recommended)
+# Set up DNS delegation to Route53 for this domain
+domain_name = ""  # e.g., "yourdomain.com"
 
-# EC2 Configuration
-instance_type    = "t3.medium"  # Adjust based on workload
-root_volume_size = 30
-key_name         = ""  # Optional: your EC2 key pair name for SSH
+# Networking - Restrict access (use your IP for security)
+# Find your IP: curl ifconfig.me
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Change to ["YOUR_IP/32"]
 
-# Spot pricing (empty = use on-demand as max)
-spot_max_price = ""
+# =============================================================================
+# Instance Types
+# =============================================================================
+# Rancher server (on-demand, stable control plane)
+# t4g.small = 2 vCPU, 2GB RAM (~$15/mo) - minimum for Rancher
+rancher_instance_type = "t4g.small"
 
-# RDS Configuration (smallest possible)
-db_instance_class    = "db.t4g.micro"
+# k3s workers (spot, cost-effective)
+# r7g.medium = 1 vCPU, 8GB RAM (~$15-20/mo spot) - good for AI workloads
+worker_instance_type = "r7g.medium"
+worker_count         = 1
+worker_volume_size   = 50
+
+# =============================================================================
+# Database (External RDS for persistence)
+# =============================================================================
+db_instance_class    = "db.t4g.micro"  # ~$12/mo
 db_allocated_storage = 20
 
 # =============================================================================
-# REQUIRED: OpenRouter Configuration
+# Storage
 # =============================================================================
-openrouter_api_key = "sk-or-v1-your-openrouter-api-key-here"
+# S3 bucket for file uploads (survives spot termination)
+s3_bucket_name = "pv-ai-bucket"  # Your existing bucket or new name
+s3_key_prefix  = "openwebui/"
+
+# =============================================================================
+# REQUIRED: OpenRouter API Key
+# =============================================================================
+openrouter_api_key = "sk-or-v1-your-key-here"
 
 # =============================================================================
 # LiteLLM Configuration
 # =============================================================================
-# Leave empty to auto-generate
-litellm_master_key = ""
+litellm_master_key = ""  # Leave empty to auto-generate
 
-# Models to expose through LiteLLM
-# Format: model_name (your alias), litellm_provider, model_id (OpenRouter model)
+# Models - define your own from OpenRouter
 litellm_models = [
   {
     model_name       = "mistral-medium"
     litellm_provider = "openrouter"
     model_id         = "mistralai/mistral-medium"
-  },
-  {
-    model_name       = "claude-3-sonnet"
-    litellm_provider = "openrouter"
-    model_id         = "anthropic/claude-3-sonnet"
-  },
-  {
-    model_name       = "gpt-4-turbo"
-    litellm_provider = "openrouter"
-    model_id         = "openai/gpt-4-turbo"
-  },
-  {
-    model_name       = "llama-3-70b"
-    litellm_provider = "openrouter"
-    model_id         = "meta-llama/llama-3-70b-instruct"
   }
 ]
 
-# Default model (should match one of your model_id values)
 default_model = "mistralai/mistral-medium"
-
-# System prompt
-system_prompt = "You are a helpful AI assistant."
 
 # =============================================================================
 # OpenWebUI Configuration
@@ -74,6 +70,8 @@ openwebui_admin_email    = "admin@example.com"
 openwebui_admin_password = ""  # Leave empty to auto-generate
 openwebui_admin_name     = "Admin"
 
-# Service ports
-openwebui_port = 3000
-litellm_port   = 4000
+# =============================================================================
+# Optional: MCP Server Tokens
+# =============================================================================
+github_token       = ""
+google_maps_api_key = ""

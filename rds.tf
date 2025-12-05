@@ -1,91 +1,67 @@
-# =============================================================================
-# Random password for RDS
-# =============================================================================
 resource "random_password" "db_password" {
-  length           = 32
-  special          = true
- override_special = "!#$%&*()-_=+[]{}<>?"
- }
+  length  = 32
+  special = false
+}
 
-# =============================================================================
-# RDS PostgreSQL Instance
-# =============================================================================
+resource "aws_security_group" "rds" {
+  name        = "${local.cluster_name}-rds-sg"
+  description = "RDS security group"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.cluster_name}-rds-sg"
+  }
+}
+
 resource "aws_db_instance" "postgres" {
-  identifier = "${var.project_name}-postgres"
+  identifier     = "${local.cluster_name}-postgres"
+  engine         = "postgres"
+  engine_version = "17"
+  instance_class = var.db_instance_class
 
-  engine               = "postgres"
-  engine_version       = "17"
-  instance_class       = var.db_instance_class
-  allocated_storage    = var.db_allocated_storage
-  max_allocated_storage = var.db_allocated_storage * 2
+  allocated_storage     = 20
+  max_allocated_storage = 100
+  storage_type          = "gp3"
+  storage_encrypted     = true
 
-  db_name  = var.db_name
-  username = var.db_username
+  db_name  = "aiplatform"
+  username = "aiplatform"
   password = random_password.db_password.result
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  # Make it publicly accessible (since we're in public subnets)
-  publicly_accessible = true
-
-  # Storage
-  storage_type      = "gp3"
-  storage_encrypted = true
-
-  # Backup and maintenance
   backup_retention_period = 7
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "Mon:04:00-Mon:05:00"
-
-  # Disable Performance Insights to save costs
-  performance_insights_enabled = false
-
-  # Deletion protection (disable for dev)
-  deletion_protection = var.environment == "prod" ? true : false
-  skip_final_snapshot = var.environment != "prod"
-  final_snapshot_identifier = var.environment == "prod" ? "${var.project_name}-final-snapshot" : null
-
-  # Apply changes immediately in dev
-  apply_immediately = var.environment != "prod"
+  skip_final_snapshot     = true
+  deletion_protection     = false
 
   tags = {
-    Name = "${var.project_name}-postgres"
+    Name = "${local.cluster_name}-postgres"
   }
 }
 
-# =============================================================================
-# Store DB password in Parameter Store
-# =============================================================================
 resource "aws_ssm_parameter" "db_password" {
-  name        = "/${var.project_name}/db/password"
-  description = "PostgreSQL database password"
-  type        = "SecureString"
-  value       = random_password.db_password.result
-
-  tags = {
-    Name = "${var.project_name}-db-password"
-  }
-}
-
-resource "aws_ssm_parameter" "db_host" {
-  name        = "/${var.project_name}/db/host"
-  description = "PostgreSQL database host"
-  type        = "String"
-  value       = aws_db_instance.postgres.address
-
-  tags = {
-    Name = "${var.project_name}-db-host"
-  }
+  name  = "/${var.project_name}/${var.environment}/db/password"
+  type  = "SecureString"
+  value = random_password.db_password.result
 }
 
 resource "aws_ssm_parameter" "db_connection_string" {
-  name        = "/${var.project_name}/db/connection_string"
-  description = "PostgreSQL database connection string"
-  type        = "SecureString"
-  value       = "postgresql://${var.db_username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
-
-  tags = {
-    Name = "${var.project_name}-db-connection-string"
-  }
+  name  = "/${var.project_name}/${var.environment}/db/connection-string"
+  type  = "SecureString"
+  value = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
 }
