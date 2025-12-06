@@ -38,7 +38,6 @@ resource "kubernetes_role_binding" "argocd_ai_platform" {
 }
 
 resource "kubernetes_manifest" "ai_platform_app" {
-  count = var.deploy_ai_platform ? 1 : 0
 
   field_manager {
     force_conflicts = true

@@ -135,7 +135,25 @@ resource "kubectl_manifest" "nginx_deploy" {
 
 }
 
+resource "kubectl_manifest" "nginx_gateway_service_patch" {
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Service"
+    metadata = {
+      name      = "nginx-gateway-nginx"
+      namespace = "nginx-gateway"
+    }
+    spec = {
+      type = "LoadBalancer"
+    }
+  })
 
+  server_side_apply = true
+  force_conflicts   = true
+wait_for_rollout = true
+wait = true
+  depends_on = [kubectl_manifest.nginx_deploy]
+}
 
 
 
@@ -279,17 +297,3 @@ resource "kubectl_manifest" "cert_reference_grant" {
 
   depends_on = [kubectl_manifest.nginx_deploy,kubernetes_namespace.app]
 }
-
-data "kubernetes_service" "nginx_gateway" {
-  metadata {
-    name      = "nginx-gateway-nginx"
-    namespace = "nginx-gateway"
-  }
-
-  depends_on = [kubectl_manifest.nginx_gateway]
-}
-
-data "aws_route53_zone" "main" {
-  name = var.domain_name
-}
-
