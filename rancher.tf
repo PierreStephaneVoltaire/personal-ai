@@ -252,6 +252,8 @@ if ! blkid $DEVICE; then
 fi
 mount $DEVICE /var/lib/rancher
 echo "$DEVICE /var/lib/rancher ext4 defaults,nofail 0 2" >> /etc/fstab
+mkdir -p /var/lib/rancher/etc-rancher
+ln -s /var/lib/rancher/etc-rancher /etc/rancher
 ls /var/lib/rancher
 # ACME
 export HOME=/root
@@ -276,7 +278,7 @@ mkdir -p /opt/rancher/ssl
 docker run -d --restart=unless-stopped \
   -p 80:80 -p 443:443 \
   --privileged \
-  -v /var/lib/rancher:/var/lib/rancher \
+  -v /var/lib/rancher/docker:/var/lib/rancher \
   -v /opt/rancher/ssl/cert.pem:/etc/rancher/ssl/cert.pem \
   -v /opt/rancher/ssl/key.pem:/etc/rancher/ssl/key.pem \
   -e CATTLE_BOOTSTRAP_PASSWORD="${random_password.rancher_admin.result}" \

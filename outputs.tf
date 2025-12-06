@@ -76,3 +76,7 @@ output "domain_name" {
 output "aws_region" {
   value = var.aws_region
 }
+
+output "rancher_server_id" {
+  value = aws_instance.rancher_server.id
+}
