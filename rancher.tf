@@ -234,13 +234,6 @@ systemctl start docker
 systemctl enable docker
 usermod -aG docker ec2-user
 
-# Swap
-dd if=/dev/zero of=/swapfile bs=1M count=2048
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
-
 # Mount EBS for Rancher data persistence
 mkdir -p /var/lib/rancher
 # Wait for EBS to attach
@@ -255,25 +248,47 @@ echo "$DEVICE /var/lib/rancher ext4 defaults,nofail 0 2" >> /etc/fstab
 mkdir -p /var/lib/rancher/etc-rancher
 ln -s /var/lib/rancher/etc-rancher /etc/rancher
 ls /var/lib/rancher
+
 # ACME
 export HOME=/root
 curl https://get.acme.sh | sh -s email=${var.email}
 mkdir -p /opt/rancher/ssl
 
-/root/.acme.sh/acme.sh --set-default-ca --server zerossl
-
-/root/.acme.sh/acme.sh --issue --standalone \
+# Try ZeroSSL first, fallback to Let's Encrypt if it fails
+echo "Attempting to issue certificate with ZeroSSL..."
+if /root/.acme.sh/acme.sh --issue --standalone \
   --domain rancher.${var.domain_name} \
   --httpport 80 \
   --server zerossl \
   --eab-kid "${var.zerossl_eab_kid}" \
   --eab-hmac-key "${var.zerossl_eab_hmac_key}" \
-   --debug || echo true
+  --debug; then
+  echo "ZeroSSL certificate issued successfully"
+  CERT_ISSUED=true
+else
+  echo "ZeroSSL failed, falling back to Let's Encrypt..."
+  /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+  if /root/.acme.sh/acme.sh --issue --standalone \
+    --domain rancher.${var.domain_name} \
+    --httpport 80 \
+    --server letsencrypt \
+    --debug; then
+    echo "Let's Encrypt certificate issued successfully"
+    CERT_ISSUED=true
+  else
+    echo "Both ZeroSSL and Let's Encrypt failed"
+    CERT_ISSUED=false
+  fi
+fi
 
-
-/root/.acme.sh/acme.sh --install-cert --domain rancher.${var.domain_name} \
-  --fullchain-file /opt/rancher/ssl/cert.pem \
-  --key-file /opt/rancher/ssl/key.pem
+if [ "$CERT_ISSUED" = true ]; then
+  /root/.acme.sh/acme.sh --install-cert --domain rancher.${var.domain_name} \
+    --fullchain-file /opt/rancher/ssl/cert.pem \
+    --key-file /opt/rancher/ssl/key.pem
+else
+  echo "Failed to obtain certificate from any provider"
+  exit 1
+fi
 
 docker run -d --restart=unless-stopped \
   -p 80:80 -p 443:443 \
@@ -286,7 +301,6 @@ docker run -d --restart=unless-stopped \
   --no-cacerts
 EOF
 }
-
 
 resource "null_resource" "force_replacement" {
   triggers = {

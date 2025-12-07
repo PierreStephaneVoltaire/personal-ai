@@ -32,6 +32,10 @@ output "rancher_server_sg_id" {
   value = aws_security_group.rancher_server.id
 }
 
+output "rancher_node_sg_id" {
+  value = aws_security_group.rancher_node.id
+}
+
 output "rancher_node_sg_name" {
   value = aws_security_group.rancher_node.name
 }
@@ -79,4 +83,8 @@ output "aws_region" {
 
 output "rancher_server_id" {
   value = aws_instance.rancher_server.id
+}
+
+output "availability_zone" {
+  value = data.aws_availability_zones.available.names[0]
 }
