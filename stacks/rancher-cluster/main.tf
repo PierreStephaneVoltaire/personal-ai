@@ -46,7 +46,7 @@ resource "rancher2_cluster_v2" "main" {
   kubernetes_version = var.kubernetes_version
   rke_config {
     machine_global_config = yamlencode({
-      disable-cloud-controller    = true
+      # disable-cloud-controller    = true
       etcd-s3                     = true
       etcd-s3-bucket              = data.terraform_remote_state.base.outputs.s3_bucket
       etcd-s3-region              = var.aws_region
