@@ -25,4 +25,3 @@ output "kube_token" {
   value     = yamldecode(data.rancher2_cluster_v2.main.kube_config).users[0].user.token
   sensitive = true
 }
-

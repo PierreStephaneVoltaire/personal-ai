@@ -15,17 +15,12 @@ variable "environment" {
 
 variable "kubernetes_version" {
   type    = string
-  default = "v1.31.13-k3s1"
+  default = "v1.31.6+rke2r1"
 }
 
 variable "worker_instance_type" {
   type    = string
-  default = "m6g.xlarge"
-}
-
-variable "worker_count" {
-  type    = number
-  default = 1
+  default = "c6gn.large"
 }
 
 variable "stopped" {
