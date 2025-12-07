@@ -37,8 +37,8 @@ resource "rancher2_machine_config_v2" "worker" {
 }
 resource "rancher2_setting" "server_url" {
   depends_on = [rancher2_bootstrap.admin]
-  name  = "server-url"
-  value = data.terraform_remote_state.base.outputs.rancher_server_url
+  name       = "server-url"
+  value      = data.terraform_remote_state.base.outputs.rancher_server_url
 }
 
 resource "rancher2_cluster_v2" "main" {
@@ -46,35 +46,36 @@ resource "rancher2_cluster_v2" "main" {
   kubernetes_version = var.kubernetes_version
   rke_config {
     machine_global_config = yamlencode({
-      cloud-provider-name           = "aws"
-      etcd-s3                       = true
-      etcd-s3-bucket                = data.terraform_remote_state.base.outputs.s3_bucket
-      etcd-s3-region                = var.aws_region
-      etcd-s3-folder                = "etcd-snapshots"
-      etcd-snapshot-schedule-cron   = "0 */6 * * *"
-      etcd-snapshot-retention       = 10
+      disable-cloud-controller    = true
+      etcd-s3                     = true
+      etcd-s3-bucket              = data.terraform_remote_state.base.outputs.s3_bucket
+      etcd-s3-region              = var.aws_region
+      etcd-s3-folder              = "etcd-snapshots"
+      etcd-snapshot-schedule-cron = "0 */6 * * *"
+      etcd-snapshot-retention     = 10
+      disable                     = ["traefik"]
     })
 
     machine_pools {
-      name                         = "pool1"
-      control_plane_role           = true
-      etcd_role                    = true
-      worker_role                  = true
-      quantity                     = 1
-      max_unhealthy                = "100%"
+      name               = "pool1"
+      control_plane_role = true
+      etcd_role          = true
+      worker_role        = true
+      quantity           = 1
+      max_unhealthy      = "100%"
 
       machine_config {
         kind = rancher2_machine_config_v2.worker.kind
         name = rancher2_machine_config_v2.worker.name
       }
-        rolling_update {
+      rolling_update {
         max_unavailable = "1"
         max_surge       = "1"
       }
     }
   }
 
-  depends_on = [rancher2_bootstrap.admin,rancher2_setting.server_url]
+  depends_on = [rancher2_bootstrap.admin, rancher2_setting.server_url]
 }
 
 data "rancher2_cluster_v2" "main" {

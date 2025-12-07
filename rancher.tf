@@ -100,7 +100,7 @@ resource "aws_security_group" "rancher_node" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-ingress {
+  ingress {
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
@@ -307,7 +307,7 @@ EOF
 
 resource "null_resource" "force_replacement" {
   triggers = {
-    user_data     = base64encode(local.user_data)
+    user_data = base64encode(local.user_data)
   }
 }
 resource "aws_eip" "rancher" {

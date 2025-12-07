@@ -57,12 +57,36 @@ resource "helm_release" "external_dns" {
 
   depends_on = [helm_release.cert_manager]
 }
+resource "helm_release" "aws_cloud_controller_manager" {
+  name       = "aws-cloud-controller-manager"
+  repository = "https://kubernetes.github.io/cloud-provider-aws"
+  chart      = "aws-cloud-controller-manager"
+  namespace  = "kube-system"
+  version    = "0.0.10"
+
+  values = [
+    yamlencode({
+      args = [
+        "--v=2",
+        "--cloud-provider=aws",
+        "--cluster-name=${local.cluster_name}",
+        "--configure-cloud-routes=false",
+        "--allocate-node-cidrs=false"
+      ]
+    })
+  ]
+
+  depends_on = [helm_release.cert_manager]
+}
 resource "kubernetes_namespace" "nginx" {
   metadata {
     annotations = {
       name = "nginx-gateway"
     }
     name = "nginx-gateway"
+  }
+  lifecycle {
+    ignore_changes = [metadata]
   }
 }
 resource "kubernetes_namespace" "app" {
@@ -71,6 +95,9 @@ resource "kubernetes_namespace" "app" {
       name = "app"
     }
     name = "app"
+  }
+  lifecycle {
+    ignore_changes = [metadata]
   }
 }
 data "http" "gateway_api_crds" {
@@ -82,12 +109,12 @@ data "kubectl_file_documents" "gateway_api_crds" {
 }
 
 resource "kubectl_manifest" "gateway_api_crds" {
-    count             =  length(data.kubectl_file_documents.gateway_api_crds.documents)
+  count = length(data.kubectl_file_documents.gateway_api_crds.documents)
 
   yaml_body         = element(data.kubectl_file_documents.gateway_api_crds.documents, count.index)
   server_side_apply = true
-  force_conflicts = true
-    depends_on = [ kubernetes_namespace.nginx ]
+  force_conflicts   = true
+  depends_on        = [kubernetes_namespace.nginx]
 
 }
 
@@ -102,12 +129,12 @@ data "kubectl_file_documents" "nginx_crds" {
 }
 
 resource "kubectl_manifest" "nginx_crds" {
-    count             =  length(data.kubectl_file_documents.nginx_crds.documents)
+  count = length(data.kubectl_file_documents.nginx_crds.documents)
 
   yaml_body         = element(data.kubectl_file_documents.nginx_crds.documents, count.index)
   server_side_apply = true
-  force_conflicts = true
-    depends_on = [ kubernetes_namespace.nginx  ,kubectl_manifest.gateway_api_crds]
+  force_conflicts   = true
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds]
 
 }
 
@@ -126,12 +153,16 @@ data "kubectl_file_documents" "nginx_deploy" {
 }
 
 resource "kubectl_manifest" "nginx_deploy" {
-    count             =  length(data.kubectl_file_documents.nginx_deploy.documents)
+  count = length(data.kubectl_file_documents.nginx_deploy.documents)
 
   yaml_body         = element(data.kubectl_file_documents.nginx_deploy.documents, count.index)
   server_side_apply = true
-  force_conflicts = true
-    depends_on = [ kubernetes_namespace.nginx  ,kubectl_manifest.gateway_api_crds]
+  force_conflicts   = true
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds]
+  ignore_fields = [
+    "status",
+  ]
+
 
 }
 
@@ -142,19 +173,17 @@ resource "kubectl_manifest" "nginx_gateway_service_patch" {
     metadata = {
       name      = "nginx-gateway-nginx"
       namespace = "nginx-gateway"
+      annotations = {
+        "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+        "service.beta.kubernetes.io/aws-load-balancer-name" : "nginx-gateway-nlb"
+
+      }
     }
     spec = {
       type = "LoadBalancer"
     }
   })
-
-  server_side_apply = true
-  force_conflicts   = true
-wait_for_rollout = true
-wait = true
-  depends_on = [kubectl_manifest.nginx_deploy]
 }
-
 
 
 
@@ -203,7 +232,7 @@ resource "kubectl_manifest" "nginx_gateway" {
     }
   })
 
-  depends_on = [kubectl_manifest.gateway_api_crds,kubectl_manifest.nginx_deploy]
+  depends_on = [kubectl_manifest.gateway_api_crds, kubectl_manifest.nginx_deploy]
 }
 
 resource "kubernetes_secret" "zerossl_eab" {
@@ -263,7 +292,7 @@ resource "kubectl_manifest" "zerossl_prod" {
     }
   })
 
-  depends_on = [helm_release.cert_manager,  kubernetes_secret.zerossl_eab]
+  depends_on = [helm_release.cert_manager, kubernetes_secret.zerossl_eab]
 }
 
 
@@ -295,5 +324,5 @@ resource "kubectl_manifest" "cert_reference_grant" {
     }
   })
 
-  depends_on = [kubectl_manifest.nginx_deploy,kubernetes_namespace.app]
+  depends_on = [kubectl_manifest.nginx_deploy, kubernetes_namespace.app]
 }

@@ -42,11 +42,11 @@ resource "kubernetes_secret" "ai_platform_secrets" {
   }
 
   data = {
-    LITELLM_MASTER_KEY  = random_password.litellm_master_key.result
-    OPENROUTER_API_KEY  = var.openrouter_api_key
-    WEBUI_SECRET_KEY    = random_password.webui_secret_key.result
-    MCPO_API_KEY        = random_password.mcpo_api_key.result
-    DATABASE_URL        = var.database_url
+    LITELLM_MASTER_KEY = random_password.litellm_master_key.result
+    OPENROUTER_API_KEY = var.openrouter_api_key
+    WEBUI_SECRET_KEY   = random_password.webui_secret_key.result
+    MCPO_API_KEY       = random_password.mcpo_api_key.result
+    DATABASE_URL       = var.database_url
   }
 
   type = "Opaque"
@@ -62,7 +62,7 @@ resource "kubernetes_config_map" "litellm_config" {
     "config.yaml" = yamlencode({
       model_list = [
         for model in var.litellm_models : {
-          model_name     = model.model_name
+          model_name = model.model_name
           litellm_params = {
             model    = "openrouter/${model.model_id}"
             api_base = "https://openrouter.ai/api/v1"
