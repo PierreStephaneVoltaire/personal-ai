@@ -191,7 +191,8 @@ resource "aws_iam_role_policy" "rancher_node" {
     Statement = [
       {
         Effect   = "Allow"
-        Action   = ["ec2:*", "elasticloadbalancing:*", "ecr:*", "s3:*", "route53:*", "ssm:*"]
+        Action   = ["ec2:*", "elasticloadbalancing:*", "ecr:*", "s3:*", "route53:*", "ssm:*", "iam:CreateServiceLinkedRole",
+        "kms:DescribeKey"]
         Resource = "*"
       }
     ]
