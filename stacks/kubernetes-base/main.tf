@@ -63,6 +63,8 @@ resource "helm_release" "aws_cloud_controller_manager" {
   chart      = "aws-cloud-controller-manager"
   namespace  = "kube-system"
   version    = "0.0.10"
+wait_for_jobs = true
+wait = true
 
   values = [
     yamlencode({
@@ -106,21 +108,23 @@ data "http" "gateway_api_crds" {
 
 data "kubectl_file_documents" "gateway_api_crds" {
   content = data.http.gateway_api_crds.response_body
+
 }
 
 resource "kubectl_manifest" "gateway_api_crds" {
   count = length(data.kubectl_file_documents.gateway_api_crds.documents)
+  depends_on = [helm_release.aws_cloud_controller_manager,kubernetes_namespace.nginx]
 
   yaml_body         = element(data.kubectl_file_documents.gateway_api_crds.documents, count.index)
   server_side_apply = true
   force_conflicts   = true
-  depends_on        = [kubernetes_namespace.nginx]
 
 }
 
 
 data "http" "nginx_crds" {
   url = "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v2.2.1/deploy/crds.yaml"
+
 }
 
 
@@ -134,7 +138,7 @@ resource "kubectl_manifest" "nginx_crds" {
   yaml_body         = element(data.kubectl_file_documents.nginx_crds.documents, count.index)
   server_side_apply = true
   force_conflicts   = true
-  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds]
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,helm_release.aws_cloud_controller_manager]
 
 }
 
@@ -145,6 +149,7 @@ resource "kubectl_manifest" "nginx_crds" {
 
 data "http" "nginx_deploy" {
   url = "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v2.2.1/deploy/default/deploy.yaml"
+
 }
 
 
@@ -158,7 +163,7 @@ resource "kubectl_manifest" "nginx_deploy" {
   yaml_body         = element(data.kubectl_file_documents.nginx_deploy.documents, count.index)
   server_side_apply = true
   force_conflicts   = true
-  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds]
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,helm_release.aws_cloud_controller_manager]
   ignore_fields = [
     "status",
   ]
@@ -167,6 +172,8 @@ resource "kubectl_manifest" "nginx_deploy" {
 }
 
 resource "kubectl_manifest" "nginx_gateway_service_patch" {
+  depends_on = [helm_release.aws_cloud_controller_manager,kubectl_manifest.nginx_deploy]
+
   yaml_body = yamlencode({
     apiVersion = "v1"
     kind       = "Service"
@@ -176,7 +183,6 @@ resource "kubectl_manifest" "nginx_gateway_service_patch" {
       annotations = {
         "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
         "service.beta.kubernetes.io/aws-load-balancer-name" : "nginx-gateway-nlb"
-
       }
     }
     spec = {
@@ -232,7 +238,7 @@ resource "kubectl_manifest" "nginx_gateway" {
     }
   })
 
-  depends_on = [kubectl_manifest.gateway_api_crds, kubectl_manifest.nginx_deploy]
+  depends_on = [kubectl_manifest.gateway_api_crds, kubectl_manifest.nginx_deploy,helm_release.aws_cloud_controller_manager]
 }
 
 resource "kubernetes_secret" "zerossl_eab" {
