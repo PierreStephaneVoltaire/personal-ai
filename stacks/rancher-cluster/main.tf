@@ -15,17 +15,6 @@ resource "rancher2_setting" "agenttlsmode" {
   value      = "system-store"
 }
 
-resource "rancher2_cloud_credential" "aws" {
-  name = "${local.cluster_name}-aws-creds"
-
-  amazonec2_credential_config {
-    access_key = data.aws_caller_identity.current.account_id
-    secret_key = ""
-  }
-
-  depends_on = [rancher2_bootstrap.admin]
-}
-
 resource "rancher2_machine_config_v2" "worker" {
   generate_name = "${local.cluster_name}-worker"
 
@@ -44,33 +33,17 @@ resource "rancher2_machine_config_v2" "worker" {
     spot_price            = "0.10"
     ssh_user              = "ec2-user"
     tags                  = "kubernetes.io/cluster/${local.cluster_name},owned"
-    userdata              = base64encode(<<-EOF
-#!/bin/bash
-yum install -y amazon-ssm-agent
-systemctl enable amazon-ssm-agent
-systemctl start amazon-ssm-agent
-EOF
-    )
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
+resource "rancher2_setting" "server_url" {
+  depends_on = [rancher2_bootstrap.admin]
+  name  = "server-url"
+  value = data.terraform_remote_state.base.outputs.rancher_server_url
+}
 
 resource "rancher2_cluster_v2" "main" {
   name               = local.cluster_name
   kubernetes_version = var.kubernetes_version
-
   rke_config {
     machine_global_config = yamlencode({
       cloud-provider-name           = "aws"
@@ -80,22 +53,10 @@ resource "rancher2_cluster_v2" "main" {
       etcd-s3-folder                = "etcd-snapshots"
       etcd-snapshot-schedule-cron   = "0 */6 * * *"
       etcd-snapshot-retention       = 10
-      cni= "canal"
-      disable=["traefik"]
     })
-
-    machine_selector_config {
-      config = yamlencode({
-        disable-cloud-controller    = true
-        kube-apiserver-arg          = ["cloud-provider=external"]
-        kube-controller-manager-arg = ["cloud-provider=external"]
-        kubelet-arg                 = ["cloud-provider=external"]
-      })
-    }
 
     machine_pools {
       name                         = "pool1"
-      cloud_credential_secret_name = rancher2_cloud_credential.aws.id
       control_plane_role           = true
       etcd_role                    = true
       worker_role                  = true
@@ -113,7 +74,7 @@ resource "rancher2_cluster_v2" "main" {
     }
   }
 
-  depends_on = [rancher2_bootstrap.admin]
+  depends_on = [rancher2_bootstrap.admin,rancher2_setting.server_url]
 }
 
 data "rancher2_cluster_v2" "main" {

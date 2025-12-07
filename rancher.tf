@@ -100,7 +100,12 @@ resource "aws_security_group" "rancher_node" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
+ingress {
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
   ingress {
     from_port   = 30000
     to_port     = 32767
@@ -249,12 +254,10 @@ mkdir -p /var/lib/rancher/etc-rancher
 ln -s /var/lib/rancher/etc-rancher /etc/rancher
 ls /var/lib/rancher
 
-# ACME
 export HOME=/root
 curl https://get.acme.sh | sh -s email=${var.email}
 mkdir -p /opt/rancher/ssl
 
-# Try ZeroSSL first, fallback to Let's Encrypt if it fails
 echo "Attempting to issue certificate with ZeroSSL..."
 if /root/.acme.sh/acme.sh --issue --standalone \
   --domain rancher.${var.domain_name} \
@@ -276,7 +279,7 @@ else
     echo "Let's Encrypt certificate issued successfully"
     CERT_ISSUED=true
   else
-    echo "Both ZeroSSL and Let's Encrypt failed"
+    echo "Both ZeroSSL and Let's Encrypt failed...we're screwed..."
     CERT_ISSUED=false
   fi
 fi
@@ -291,7 +294,7 @@ else
 fi
 
 docker run -d --restart=unless-stopped \
-  -p 80:80 -p 443:443 \
+  -p 80:80 -p 443:443 -p 6443:6443 \
   --privileged \
   -v /var/lib/rancher/docker:/var/lib/rancher \
   -v /opt/rancher/ssl/cert.pem:/etc/rancher/ssl/cert.pem \

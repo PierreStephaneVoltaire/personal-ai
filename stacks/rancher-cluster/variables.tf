@@ -15,7 +15,7 @@ variable "environment" {
 
 variable "kubernetes_version" {
   type    = string
-  default = "v1.31.6+rke2r1"
+  default =  "v1.33.5-k3s1"
 }
 
 variable "worker_instance_type" {
