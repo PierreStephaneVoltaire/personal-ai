@@ -1,7 +1,7 @@
 
 data "aws_lb" "nlb" {
   tags = {
-    "kubernetes.io/cluster/personalai-dev" = "owned"
+    "kubernetes.io/cluster/${data.terraform_remote_state.base.outputs.cluster_name}" = "owned"
     "kubernetes.io/service-name"           = "nginx-gateway/nginx-gateway-nginx"
   }
 }

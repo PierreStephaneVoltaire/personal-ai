@@ -17,11 +17,6 @@ variable "openrouter_api_key" {
   sensitive = true
 }
 
-variable "database_url" {
-  type      = string
-  sensitive = true
-  default   = ""
-}
 
 variable "timezone" {
   type    = string
