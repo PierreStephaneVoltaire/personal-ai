@@ -7,8 +7,6 @@ resource "kubernetes_namespace" "argocd" {
   }
 }
 
-
-
 resource "aws_ssm_parameter" "argocd_admin_password" {
   count = var.stopped ? 0 : 1
   name  = "/${var.project_name}/${var.environment}/argocd/admin-password"
@@ -16,10 +14,7 @@ resource "aws_ssm_parameter" "argocd_admin_password" {
   value = data.kubernetes_secret.argocd_admin.data["password"]
 }
 
-
 resource "helm_release" "argocd" {
-
-
   name          = "argocd"
   repository    = "https://argoproj.github.io/argo-helm"
   chart         = "argo-cd"
@@ -28,6 +23,7 @@ resource "helm_release" "argocd" {
   wait          = true
   wait_for_jobs = true
   timeout       = 600
+
   set {
     name  = "configs.params.server\\.insecure"
     value = "true"
@@ -43,10 +39,9 @@ resource "helm_release" "argocd" {
     value = "argocd.${var.domain_name}"
   }
 
-  depends_on = [
-    kubernetes_namespace.argocd
-  ]
+  depends_on = [kubernetes_namespace.argocd]
 }
+
 data "kubernetes_secret" "argocd_admin" {
   metadata {
     name      = "argocd-initial-admin-secret"
@@ -54,7 +49,6 @@ data "kubernetes_secret" "argocd_admin" {
   }
   depends_on = [helm_release.argocd]
 }
-
 
 resource "kubectl_manifest" "argocd_httproute" {
   yaml_body = yamlencode({
@@ -94,7 +88,5 @@ resource "kubectl_manifest" "argocd_httproute" {
     }
   })
 
-  depends_on = [
-    helm_release.argocd
-  ]
+  depends_on = [helm_release.argocd]
 }

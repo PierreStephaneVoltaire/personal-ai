@@ -46,7 +46,7 @@ resource "kubernetes_secret" "ai_platform_secrets" {
     OPENROUTER_API_KEY = var.openrouter_api_key
     WEBUI_SECRET_KEY   = random_password.webui_secret_key.result
     MCPO_API_KEY       = random_password.mcpo_api_key.result
-    DATABASE_URL       =  data.terraform_remote_state.base.outputs.db_connection_string
+    DATABASE_URL       = data.terraform_remote_state.base.outputs.db_connection_string
   }
 
   type = "Opaque"
@@ -72,7 +72,6 @@ resource "kubernetes_config_map" "litellm_config" {
       ]
       general_settings = {
         master_key = "os.environ/LITELLM_MASTER_KEY"
-        health_check_auth="false"
       }
     })
   }
