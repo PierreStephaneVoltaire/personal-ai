@@ -16,49 +16,49 @@ spec:
         app: litellm
     spec:
       containers:
-      - name: litellm
-        image: ghcr.io/berriai/litellm:main-latest
-        ports:
-        - containerPort: 4000
-        args: ["--config", "/app/config.yaml", "--port", "4000"]
-        env:
-        - name: LITELLM_MASTER_KEY
-          valueFrom:
-            secretKeyRef:
-              name: ai-platform-secrets
-              key: LITELLM_MASTER_KEY
-        - name: OPENROUTER_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: ai-platform-secrets
-              key: OPENROUTER_API_KEY
-        volumeMounts:
-        - name: config
-          mountPath: /app/config.yaml
-          subPath: config.yaml
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 4000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 4000
-          initialDelaySeconds: 10
-          periodSeconds: 5
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-latest
+          ports:
+            - containerPort: 4000
+          args: ["--config", "/app/config.yaml", "--port", "4000"]
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-platform-secrets
+                  key: LITELLM_MASTER_KEY
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-platform-secrets
+                  key: OPENROUTER_API_KEY
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 5
       volumes:
-      - name: config
-        configMap:
-          name: litellm-config
+        - name: config
+          configMap:
+            name: litellm-config
 ---
 apiVersion: v1
 kind: Service
@@ -69,6 +69,6 @@ spec:
   selector:
     app: litellm
   ports:
-  - port: 4000
-    targetPort: 4000
+    - port: 4000
+      targetPort: 4000
   type: ClusterIP
