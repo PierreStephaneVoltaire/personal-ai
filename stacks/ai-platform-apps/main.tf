@@ -1,14 +1,14 @@
 resource "kubernetes_service_account" "argocd_ai_platform" {
   metadata {
     name      = "argocd-application-controller"
-    namespace = data.terraform_remote_state.kubernetes_base.outputs.namespace
+    namespace = "app"
   }
 }
 
 resource "kubernetes_role" "argocd_ai_platform" {
   metadata {
     name      = "argocd-application-controller"
-    namespace = data.terraform_remote_state.kubernetes_base.outputs.namespace
+    namespace = "app"
   }
 
   rule {
@@ -21,7 +21,7 @@ resource "kubernetes_role" "argocd_ai_platform" {
 resource "kubernetes_role_binding" "argocd_ai_platform" {
   metadata {
     name      = "argocd-application-controller"
-    namespace = data.terraform_remote_state.kubernetes_base.outputs.namespace
+    namespace = "app"
   }
 
   role_ref {
