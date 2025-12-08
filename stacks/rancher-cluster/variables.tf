@@ -17,10 +17,13 @@ variable "kubernetes_version" {
   type    = string
   default = "v1.33.5-k3s1"
 }
-
+variable "control_instance_type" {
+  type    = string
+  default = "r6g.medium"
+}
 variable "worker_instance_type" {
   type    = string
-  default = "c6gn.large"
+  default = "c6gn.xlarge"
 }
 
 variable "stopped" {

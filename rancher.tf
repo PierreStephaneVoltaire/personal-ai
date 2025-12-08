@@ -71,7 +71,8 @@ resource "aws_security_group" "rancher_server" {
   }
 
   tags = {
-    Name = "${local.cluster_name}-rancher-server-sg"
+    Name                                          = "${local.cluster_name}-rancher-server-sg"
+    "kubernetes.io/cluster/${local.cluster_name}" = "owned"
   }
 }
 
@@ -107,8 +108,8 @@ resource "aws_security_group" "rancher_node" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    from_port   = 30000
-    to_port     = 32767
+    from_port   = 2379
+    to_port     = 9345 
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

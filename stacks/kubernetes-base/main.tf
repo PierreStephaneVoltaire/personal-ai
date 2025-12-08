@@ -57,29 +57,7 @@ resource "helm_release" "external_dns" {
 
   depends_on = [helm_release.cert_manager]
 }
-resource "helm_release" "aws_cloud_controller_manager" {
-  name       = "aws-cloud-controller-manager"
-  repository = "https://kubernetes.github.io/cloud-provider-aws"
-  chart      = "aws-cloud-controller-manager"
-  namespace  = "kube-system"
-  version    = "0.0.10"
-wait_for_jobs = true
-wait = true
 
-  values = [
-    yamlencode({
-      args = [
-        "--v=2",
-        "--cloud-provider=aws",
-        "--cluster-name=${local.cluster_name}",
-        "--configure-cloud-routes=false",
-        "--allocate-node-cidrs=false"
-      ]
-    })
-  ]
-
-  depends_on = [helm_release.cert_manager]
-}
 resource "kubernetes_namespace" "nginx" {
   metadata {
     annotations = {
@@ -113,7 +91,7 @@ data "kubectl_file_documents" "gateway_api_crds" {
 
 resource "kubectl_manifest" "gateway_api_crds" {
   count = length(data.kubectl_file_documents.gateway_api_crds.documents)
-  depends_on = [helm_release.aws_cloud_controller_manager,kubernetes_namespace.nginx]
+  depends_on = [kubernetes_namespace.nginx]
 
   yaml_body         = element(data.kubectl_file_documents.gateway_api_crds.documents, count.index)
   server_side_apply = true
@@ -138,7 +116,7 @@ resource "kubectl_manifest" "nginx_crds" {
   yaml_body         = element(data.kubectl_file_documents.nginx_crds.documents, count.index)
   server_side_apply = true
   force_conflicts   = true
-  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,helm_release.aws_cloud_controller_manager]
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,]
 
 }
 
@@ -163,7 +141,7 @@ resource "kubectl_manifest" "nginx_deploy" {
   yaml_body         = element(data.kubectl_file_documents.nginx_deploy.documents, count.index)
   server_side_apply = true
   force_conflicts   = true
-  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,helm_release.aws_cloud_controller_manager]
+  depends_on        = [kubernetes_namespace.nginx, kubectl_manifest.gateway_api_crds,]
   ignore_fields = [
     "status",
   ]
@@ -172,7 +150,7 @@ resource "kubectl_manifest" "nginx_deploy" {
 }
 
 resource "kubectl_manifest" "nginx_gateway_service_patch" {
-  depends_on = [helm_release.aws_cloud_controller_manager,kubectl_manifest.nginx_deploy]
+  depends_on = [kubectl_manifest.nginx_deploy]
 
   yaml_body = yamlencode({
     apiVersion = "v1"
@@ -238,7 +216,7 @@ resource "kubectl_manifest" "nginx_gateway" {
     }
   })
 
-  depends_on = [kubectl_manifest.gateway_api_crds, kubectl_manifest.nginx_deploy,helm_release.aws_cloud_controller_manager]
+  depends_on = [kubectl_manifest.gateway_api_crds, kubectl_manifest.nginx_deploy,]
 }
 
 resource "kubernetes_secret" "zerossl_eab" {
