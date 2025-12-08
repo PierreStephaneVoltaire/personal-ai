@@ -19,11 +19,7 @@ variable "kubernetes_version" {
 }
 variable "control_instance_type" {
   type    = string
-  default = "r6g.medium"
-}
-variable "worker_instance_type" {
-  type    = string
-  default = "c6gn.xlarge"
+  default = "c6gn.large"
 }
 
 variable "stopped" {

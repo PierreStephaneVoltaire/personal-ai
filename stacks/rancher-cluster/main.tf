@@ -15,28 +15,6 @@ resource "rancher2_setting" "agenttlsmode" {
   value      = "system-store"
 }
 
-resource "rancher2_machine_config_v2" "worker" {
-  generate_name = "${local.cluster_name}-worker"
-
-  amazonec2_config {
-    ami                   = data.terraform_remote_state.base.outputs.ami_id
-    region                = var.aws_region
-    zone                  = substr(data.terraform_remote_state.base.outputs.availability_zone, -1, 1)
-    instance_type         = var.worker_instance_type
-    vpc_id                = data.terraform_remote_state.base.outputs.vpc_id
-    subnet_id             = data.terraform_remote_state.base.outputs.public_subnet_ids[0]
-    security_group        = [data.terraform_remote_state.base.outputs.rancher_node_sg_name]
-    iam_instance_profile  = data.terraform_remote_state.base.outputs.rancher_node_instance_profile
-    root_size             = "50"
-    volume_type           = "gp3"
-      http_endpoint = "enabled"
-http_tokens   = "optional"
-    request_spot_instance = true
-    spot_price            = "0.10"
-    ssh_user              = "ec2-user"
-    tags                  = "kubernetes.io/cluster/${local.cluster_name},owned"
-  }
-}
 resource "rancher2_machine_config_v2" "controller" {
   generate_name = "${local.cluster_name}-controller"
 
@@ -88,8 +66,6 @@ resource "rancher2_cluster_v2" "main" {
 
     machine_selector_config {
       config = yamlencode({
-        # kube-apiserver-arg          = ["cloud-provider=external"]
-        # kube-controller-manager-arg = ["cloud-provider=external"]
         kubelet-arg                 =  [
       "cloud-provider=external"
     ]
@@ -158,17 +134,6 @@ EOT
         max_surge       = "1"
       }
     }
-    machine_pools {
-      name               = "worker-pool"
-      control_plane_role = false
-      etcd_role          = false
-      worker_role        = true
-      quantity           = 1
-      machine_config {
-        kind = rancher2_machine_config_v2.worker.kind
-        name = rancher2_machine_config_v2.worker.name
-      }
-}
   }
 
   depends_on = [rancher2_bootstrap.admin, rancher2_setting.server_url]
