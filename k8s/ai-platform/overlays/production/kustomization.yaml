@@ -15,7 +15,7 @@ patchesJson6902:
     patch: |-
       - op: replace
         path: /spec/hostnames/0
-        value: ai.pv-ai.com
+        value: ai.despairdrivendevelopment.net
   - target:
       group: gateway.networking.k8s.io
       version: v1
@@ -24,7 +24,7 @@ patchesJson6902:
     patch: |-
       - op: replace
         path: /spec/hostnames/0
-        value: ai.pv-ai.com
+        value: ai.despairdrivendevelopment.net
 
 commonLabels:
   environment: production
