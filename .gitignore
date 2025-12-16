@@ -476,8 +476,10 @@ FodyWeavers.xsd
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform,visualstudio,windows,git
 /local
-**/**/.terraform.lock.hcl
+
+# Terraform lock files
 .terraform.lock.hcl
+**/.terraform.lock.hcl
 
 # Kubernetes config files
 kubeconfig
