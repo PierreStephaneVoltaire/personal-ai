@@ -50,7 +50,6 @@ openrouter_api_key = "sk-or-v1-your-key-here"
 # =============================================================================
 # LiteLLM Configuration
 # =============================================================================
-litellm_master_key = ""  # Leave empty to auto-generate
 
 # Models - define your own from OpenRouter
 litellm_models = [

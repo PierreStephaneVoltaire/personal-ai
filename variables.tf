@@ -13,18 +13,14 @@ variable "environment" {
   default = "dev"
 }
 
-variable "domain_name" {
-  type = string
-}
-
 variable "db_instance_class" {
   type    = string
   default = "db.t4g.micro"
 }
 
-variable "rancher_instance_type" {
+variable "instance_type" {
   type    = string
-  default = "t4g.medium"
+  default = "m6g.xlarge"
 }
 
 variable "zerossl_eab_kid" {
@@ -41,4 +37,35 @@ variable "zerossl_eab_hmac_key" {
 
 variable "email" {
   type = string
+}
+
+variable "timezone" {
+  type    = string
+  default = "America/Toronto"
+}
+
+variable "litellm_models" {
+  type = list(object({
+    model_name    = string
+    model_id      = string
+    system_prompt = string
+    max_tokens    = number
+    temperature   = number
+  }))
+}
+
+variable "openrouter_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "council_members" {
+  type = map(object({
+    model_id      = string
+    role          = string
+    max_tokens    = number
+    temperature   = number
+    name          = string
+    system_prompt = string
+  }))
 }

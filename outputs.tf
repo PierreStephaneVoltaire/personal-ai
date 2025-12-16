@@ -10,17 +10,8 @@ output "public_subnet_ids" {
   value = aws_subnet.public[*].id
 }
 
-output "rancher_server_url" {
-  value = "https://rancher.${var.domain_name}"
-}
-
-output "rancher_server_ip" {
-  value = aws_instance.rancher_server.public_ip
-}
-
-output "rancher_admin_password" {
-  value     = random_password.rancher_admin.result
-  sensitive = true
+output "k3s_server_ip" {
+  value = aws_instance.k3s_server.public_ip
 }
 
 output "k3s_token" {
@@ -28,24 +19,16 @@ output "k3s_token" {
   sensitive = true
 }
 
-output "rancher_server_sg_id" {
-  value = aws_security_group.rancher_server.id
+output "compute_server_sg_id" {
+  value = aws_security_group.compute_server.id
 }
 
-output "rancher_node_sg_id" {
-  value = aws_security_group.rancher_node.id
-}
-
-output "rancher_node_sg_name" {
-  value = aws_security_group.rancher_node.name
-}
-
-output "rancher_node_instance_profile" {
-  value = aws_iam_instance_profile.rancher_node.name
+output "compute_server_instance_profile" {
+  value = aws_iam_instance_profile.compute_server.name
 }
 
 output "ami_id" {
-  value = data.aws_ami.amazon_linux_2_arm.id
+  value = data.aws_ami.al2023_arm.id
 }
 
 output "rds_endpoint" {
@@ -65,24 +48,13 @@ output "s3_bucket" {
   value = aws_s3_bucket.ai_storage.id
 }
 
-output "route53_zone_id" {
-  value = aws_route53_zone.main.zone_id
-}
-
-output "route53_nameservers" {
-  value = aws_route53_zone.main.name_servers
-}
-
-output "domain_name" {
-  value = var.domain_name
-}
 
 output "aws_region" {
   value = var.aws_region
 }
 
-output "rancher_server_id" {
-  value = aws_instance.rancher_server.id
+output "k3s_server_id" {
+  value = aws_instance.k3s_server.id
 }
 
 output "availability_zone" {

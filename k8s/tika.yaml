@@ -22,23 +22,11 @@ spec:
         - containerPort: 9998
         resources:
           requests:
-            memory: "256Mi"
+            memory: "512Mi"
             cpu: "100m"
           limits:
-            memory: "512Mi"
-            cpu: "300m"
-        livenessProbe:
-          httpGet:
-            path: /tika
-            port: 9998
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /tika
-            port: 9998
-          initialDelaySeconds: 10
-          periodSeconds: 5
+            memory: "1Gi"
+            cpu: "200m"
 ---
 apiVersion: v1
 kind: Service

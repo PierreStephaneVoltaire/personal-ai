@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: council
+  namespace: ai-platform
+  labels:
+    app: council
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: council
+  template:
+    metadata:
+      labels:
+        app: council
+      annotations:
+        config-hash: "${config_hash}"
+    spec:
+      initContainers:
+      - name: setup
+        image: public.ecr.aws/docker/library/python:3.12-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            set -e
+            echo "Starting setup..."
+            
+            # Install awscli
+            echo "Installing AWS CLI..."
+            apt-get update && apt-get install -y awscli --no-install-recommends
+            rm -rf /var/lib/apt/lists/*
+            
+            # Download from S3
+            echo "Downloading application files from S3..."
+            aws s3 cp s3://pv-ai-bucket/council/ /app/ --recursive --region ca-central-1
+            
+            # Install Python dependencies to shared volume
+            echo "Installing Python dependencies..."
+            if [ -f /app/requirements.txt ]; then
+              pip install --no-cache-dir --target=/app/python-packages -r /app/requirements.txt
+              echo "Dependencies installed successfully"
+            else
+              echo "ERROR: requirements.txt not found!"
+              exit 1
+            fi
+            
+            echo "Setup complete"
+        env:
+        - name: AWS_DEFAULT_REGION
+          value: "ca-central-1"
+        volumeMounts:
+        - name: app-data
+          mountPath: /app
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      containers:
+      - name: council
+        image: public.ecr.aws/docker/library/python:3.12-slim
+        ports:
+        - containerPort: 8000
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            set -e
+            echo "Starting council application..."
+            cd /app
+            
+            # Add Python packages to path
+            export PYTHONPATH="/app/python-packages:$PYTHONPATH"
+            
+            ls -la
+            echo "Starting uvicorn..."
+            python -m uvicorn main:app --host 0.0.0.0 --port 8000
+        env:
+        - name: LITELLM_URL
+          value: "http://litellm:4000"
+        - name: REDIS_URL
+          value: "redis://valkey:6379"
+        - name: PYTHONPATH
+          value: "/app/python-packages"
+        volumeMounts:
+        - name: app-data
+          mountPath: /app
+        - name: config
+          mountPath: /app/config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "150m"
+          limits:
+            memory: "1Gi"
+            cpu: "300m"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: app-data
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: council-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: council
+  namespace: ai-platform
+spec:
+  selector:
+    app: council
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
