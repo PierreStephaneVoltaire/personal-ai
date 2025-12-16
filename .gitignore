@@ -478,3 +478,19 @@ FodyWeavers.xsd
 /local
 **/**/.terraform.lock.hcl
 .terraform.lock.hcl
+
+# Kubernetes config files
+kubeconfig
+**/kubeconfig
+*.kubeconfig
+
+# Markdown files
+*.md
+
+# Terraform state backups
+*.tfstate.backup
+*.tfstate.*.backup
+
+# Additional tfvars patterns
+terraform.tfvars
+**/terraform.tfvars
