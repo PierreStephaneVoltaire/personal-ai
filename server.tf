@@ -108,6 +108,23 @@ resource "aws_ssm_parameter" "litellm_master_key" {
   }
 }
 
+resource "random_password" "litellm_ui_password" {
+  length  = 16
+  special = false
+}
+
+resource "aws_ssm_parameter" "litellm_ui_password" {
+  name        = "/${var.project_name}/${var.environment}/litellm/ui-password"
+  description = "LiteLLM UI Password"
+  type        = "SecureString"
+  value       = random_password.litellm_ui_password.result
+
+  tags = {
+    Name        = "litellm-ui-password"
+    Environment = var.environment
+  }
+}
+
 resource "kubernetes_secret" "ai_platform_secrets" {
   metadata {
     name      = "ai-platform-secrets"
@@ -125,6 +142,8 @@ resource "kubernetes_secret" "ai_platform_secrets" {
     AWS_ACCESS_KEY_ID     = var.aws_access_key
     AWS_SECRET_ACCESS_KEY = var.aws_secret_key
     LITELLM_MASTER_KEY    = "sk-${random_password.litellm_master_key.result}"
+    UI_USERNAME           = "admin"
+    UI_PASSWORD           = random_password.litellm_ui_password.result
   }
 
   type = "Opaque"
@@ -161,6 +180,7 @@ resource "kubernetes_config_map" "litellm_config" {
     "config.yaml" = yamlencode({
       general_settings = {
         store_model_in_db = true
+        master_key        = "os.environ/LITELLM_MASTER_KEY"
       }
       model_list = concat(
         [

@@ -4,7 +4,7 @@ resource "null_resource" "wait_for_openwebui" {
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
     command     = <<EOF
-      export KUBECONFIG=${local_file.kubeconfig.filename}
+      export KUBECONFIG=${local.kubeconfig_path}
 
       echo "Waiting for OpenWebUI pod to be ready..."
       MAX_RETRIES=60
@@ -59,7 +59,7 @@ data "kubernetes_service" "openwebui" {
 }
 
 locals {
-  openwebui_url = "http://${aws_instance.k3s_server.public_ip}:8080"
+  openwebui_url = "http://localhost:8080"
 }
 
 # provider "openwebui" {

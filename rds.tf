@@ -3,65 +3,110 @@ resource "random_password" "db_password" {
   special = false
 }
 
-resource "aws_security_group" "rds" {
-  name        = "${local.cluster_name}-rds-sg"
-  description = "RDS security group"
-  vpc_id      = aws_vpc.main.id
+resource "kubernetes_persistent_volume_claim" "postgres_data" {
+  metadata {
+    name      = "postgres-data"
+    namespace = "default"
+  }
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "10Gi"
+      }
+    }
+  }
+  wait_until_bound = false
+}
 
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+resource "kubernetes_deployment" "postgres" {
+  metadata {
+    name      = "postgres"
+    namespace = "default"
+    labels = {
+      app = "postgres"
+    }
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "postgres"
+      }
+    }
 
-  tags = {
-    Name = "${local.cluster_name}-rds-sg"
+    template {
+      metadata {
+        labels = {
+          app = "postgres"
+        }
+      }
+
+      spec {
+        container {
+          name  = "postgres"
+          image = "pgvector/pgvector:pg17"
+
+          env {
+            name  = "POSTGRES_USER"
+            value = "aiplatform"
+          }
+          env {
+            name  = "POSTGRES_PASSWORD"
+            value = random_password.db_password.result
+          }
+          env {
+            name  = "POSTGRES_DB"
+            value = "aiplatform"
+          }
+
+          port {
+            container_port = 5432
+          }
+
+          volume_mount {
+            name       = "postgres-storage"
+            mount_path = "/var/lib/postgresql/data"
+            sub_path   = "postgres"
+          }
+
+          resources {
+            limits = {
+              cpu    = "500m"
+              memory = "1Gi"
+            }
+            requests = {
+              cpu    = "250m"
+              memory = "512Mi"
+            }
+          }
+        }
+
+        volume {
+          name = "postgres-storage"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.postgres_data.metadata[0].name
+          }
+        }
+      }
+    }
   }
 }
 
-resource "aws_db_instance" "postgres" {
-  identifier     = "${local.cluster_name}-postgres"
-  engine         = "postgres"
-  engine_version = "17"
-  instance_class = var.db_instance_class
-
-  allocated_storage     = 20
-  max_allocated_storage = 100
-  storage_type          = "gp3"
-  storage_encrypted     = true
-
-  db_name  = "aiplatform"
-  username = "aiplatform"
-  password = random_password.db_password.result
-
-  db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
-
-  backup_retention_period = 7
-  skip_final_snapshot     = true
-  deletion_protection     = false
-
-  tags = {
-    Name = "${local.cluster_name}-postgres"
+resource "kubernetes_service" "postgres" {
+  metadata {
+    name      = "postgres"
+    namespace = "default"
   }
-}
-
-resource "aws_ssm_parameter" "db_password" {
-  name  = "/${var.project_name}/${var.environment}/db/password"
-  type  = "SecureString"
-  value = random_password.db_password.result
-}
-
-resource "aws_ssm_parameter" "db_connection_string" {
-  name  = "/${var.project_name}/${var.environment}/db/connection-string"
-  type  = "SecureString"
-  value = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
+  spec {
+    selector = {
+      app = "postgres"
+    }
+    port {
+      port        = 5432
+      target_port = 5432
+    }
+    type = "ClusterIP"
+  }
 }

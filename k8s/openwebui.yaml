@@ -65,11 +65,11 @@ spec:
           mountPath: /app/backend/data
         resources:
           requests:
-            memory: "2.5Gi"
-            cpu: "600m"
+            memory: "1Gi"
+            cpu: "1000m"
           limits:
             memory: "4Gi"
-            cpu: "1000m"
+            cpu: "4000m"
         livenessProbe:
           httpGet:
             path: /health
@@ -98,4 +98,22 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
-  type: LoadBalancer
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openwebui
+  namespace: ai-platform
+spec:
+  rules:
+  - host: openwebui.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: openwebui
+            port:
+              number: 8080

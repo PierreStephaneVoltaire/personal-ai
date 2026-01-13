@@ -13,15 +13,6 @@ variable "environment" {
   default = "dev"
 }
 
-variable "db_instance_class" {
-  type    = string
-  default = "db.t4g.micro"
-}
-
-variable "instance_type" {
-  type    = string
-  default = "m6g.xlarge"
-}
 
 variable "zerossl_eab_kid" {
   type      = string
@@ -46,11 +37,10 @@ variable "timezone" {
 
 variable "litellm_models" {
   type = list(object({
-    model_name    = string
-    model_id      = string
-    system_prompt = string
-    max_tokens    = number
-    temperature   = number
+    model_name  = string
+    model_id    = string
+    max_tokens  = number
+    temperature = number
   }))
 }
 
@@ -59,13 +49,40 @@ variable "openrouter_api_key" {
   sensitive = true
 }
 
-variable "council_members" {
-  type = map(object({
-    model_id      = string
-    role          = string
-    max_tokens    = number
-    temperature   = number
-    name          = string
-    system_prompt = string
-  }))
+variable "n8n_secrets" {
+
+  description = "Map of secrets to inject as environment variables into n8n"
+
+  type = map(string)
+
+  sensitive = true
+
+  default = {}
+
+}
+
+
+
+variable "aws_access_key" {
+
+  type = string
+
+  sensitive = true
+
+}
+
+
+
+variable "aws_secret_key" {
+
+  type = string
+
+  sensitive = true
+
+}
+
+variable "mcp_filesystem_mount_paths" {
+  description = "List of host paths to mount into the MCP server container for the filesystem server"
+  type        = list(string)
+  default     = []
 }
