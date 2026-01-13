@@ -108,19 +108,38 @@ resource "aws_ssm_parameter" "litellm_master_key" {
   }
 }
 
-resource "random_password" "litellm_ui_password" {
-  length  = 16
-  special = false
-}
-
 resource "aws_ssm_parameter" "litellm_ui_password" {
   name        = "/${var.project_name}/${var.environment}/litellm/ui-password"
   description = "LiteLLM UI Password"
   type        = "SecureString"
-  value       = random_password.litellm_ui_password.result
+  value       = "sk-${random_password.litellm_master_key.result}"
 
   tags = {
     Name        = "litellm-ui-password"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "openwebui_email" {
+  name        = "/${var.project_name}/${var.environment}/openwebui/email"
+  description = "OpenWebUI Admin Email"
+  type        = "String"
+  value       = "admin"
+
+  tags = {
+    Name        = "openwebui-email"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "openwebui_password" {
+  name        = "/${var.project_name}/${var.environment}/openwebui/password"
+  description = "OpenWebUI Admin Password"
+  type        = "SecureString"
+  value       = "sk-${random_password.litellm_master_key.result}"
+
+  tags = {
+    Name        = "openwebui-password"
     Environment = var.environment
   }
 }
@@ -143,7 +162,7 @@ resource "kubernetes_secret" "ai_platform_secrets" {
     AWS_SECRET_ACCESS_KEY = var.aws_secret_key
     LITELLM_MASTER_KEY    = "sk-${random_password.litellm_master_key.result}"
     UI_USERNAME           = "admin"
-    UI_PASSWORD           = random_password.litellm_ui_password.result
+    UI_PASSWORD           = "sk-${random_password.litellm_master_key.result}"
   }
 
   type = "Opaque"
