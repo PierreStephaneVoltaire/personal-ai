@@ -496,3 +496,9 @@ kubeconfig
 # Additional tfvars patterns
 terraform.tfvars
 **/terraform.tfvars
+
+# YouTube cookies and access keys
+**/cookies.txt
+*.csv
+n8n_accessKeys.csv
+Backup-codes-*.txt
