@@ -2,45 +2,21 @@ output "cluster_name" {
   value = local.cluster_name
 }
 
-output "vpc_id" {
-  value = aws_vpc.main.id
-}
-
-output "public_subnet_ids" {
-  value = aws_subnet.public[*].id
-}
 
 output "k3s_server_ip" {
-  value = aws_instance.k3s_server.public_ip
-}
-
-output "k3s_token" {
-  value     = random_password.k3s_token.result
-  sensitive = true
-}
-
-output "compute_server_sg_id" {
-  value = aws_security_group.compute_server.id
-}
-
-output "compute_server_instance_profile" {
-  value = aws_iam_instance_profile.compute_server.name
-}
-
-output "ami_id" {
-  value = data.aws_ami.al2023_arm.id
+  value = "127.0.0.1"
 }
 
 output "rds_endpoint" {
-  value = aws_db_instance.postgres.endpoint
+  value = "postgres.default.svc.cluster.local"
 }
 
 output "rds_database_name" {
-  value = aws_db_instance.postgres.db_name
+  value = "aiplatform"
 }
 
 output "db_connection_string" {
-  value     = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
+  value     = "postgresql://aiplatform:${random_password.db_password.result}@postgres.default.svc.cluster.local:5432/aiplatform"
   sensitive = true
 }
 
@@ -48,15 +24,31 @@ output "s3_bucket" {
   value = aws_s3_bucket.ai_storage.id
 }
 
-
 output "aws_region" {
   value = var.aws_region
 }
 
-output "k3s_server_id" {
-  value = aws_instance.k3s_server.id
+output "yt_backup_service_endpoint" {
+  value       = "http://yt-backup.ai-platform.svc.cluster.local:8080"
+  description = "Internal Kubernetes service endpoint for yt-backup"
 }
 
-output "availability_zone" {
-  value = data.aws_availability_zones.available.names[0]
+output "n8n_service_endpoint" {
+  value       = "http://n8n.ai-platform.svc.cluster.local:5678"
+  description = "Internal Kubernetes service endpoint for n8n"
+}
+
+output "n8n_url" {
+  value       = "http://localhost:30678"
+  description = "External n8n URL"
+}
+
+output "rancher_url" {
+  value       = "https://rancher.local"
+  description = "Rancher UI URL"
+}
+
+output "litellm_master_key_parameter" {
+  value       = aws_ssm_parameter.litellm_master_key.name
+  description = "SSM parameter name for LiteLLM master key"
 }
