@@ -14,22 +14,6 @@ variable "environment" {
 }
 
 
-variable "zerossl_eab_kid" {
-  type      = string
-  sensitive = true
-  default   = ""
-}
-
-variable "zerossl_eab_hmac_key" {
-  type      = string
-  sensitive = true
-  default   = ""
-}
-
-variable "email" {
-  type = string
-}
-
 variable "timezone" {
   type    = string
   default = "America/Toronto"
@@ -49,17 +33,7 @@ variable "openrouter_api_key" {
   sensitive = true
 }
 
-variable "n8n_secrets" {
 
-  description = "Map of secrets to inject as environment variables into n8n"
-
-  type = map(string)
-
-  sensitive = true
-
-  default = {}
-
-}
 
 
 
@@ -85,4 +59,43 @@ variable "mcp_filesystem_mount_paths" {
   description = "List of host paths to mount into the MCP server container for the filesystem server"
   type        = list(string)
   default     = []
+}
+
+variable "discord_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "n8n_webhook_url" {
+  type      = string
+  sensitive = true
+}
+
+# PostgreSQL connection variables
+variable "postgres_host" {
+  default = "172.17.0.1"
+}
+
+variable "postgres_port" {
+  default = 5432
+}
+
+variable "n8n_db_password" {
+  sensitive = true
+}
+
+variable "n8n_database_url" {
+  sensitive = true
+}
+
+variable "openwebui_database_url" {
+  sensitive = true
+}
+
+variable "litellm_database_url" {
+  sensitive = true
+}
+
+variable "jenkins_database_url" {
+  sensitive = true
 }

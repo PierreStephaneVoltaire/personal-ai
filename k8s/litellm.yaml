@@ -15,47 +15,101 @@ spec:
       labels:
         app: litellm
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: litellm
         image: ghcr.io/berriai/litellm:main-latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - '--config'
+        - /app/config.yaml
+        - '--port'
+        - '4000'
         ports:
         - containerPort: 4000
-        args: ["--config", "/app/config.yaml", "--port", "4000"]
+          protocol: TCP
         env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ai-platform-secrets
+              key: LITELLM_DATABASE_URL
         - name: OPENROUTER_API_KEY
           valueFrom:
             secretKeyRef:
               name: ai-platform-secrets
               key: OPENROUTER_API_KEY
-        - name: OPENAI_API_KEY 
-        value: "dummy-key"      
-        volumeMounts:
-        - name: config
-          mountPath: /app/config.yaml
-          subPath: config.yaml
+        - name: OPENAI_API_KEY
+          value: "dummy-key" 
+        - name: LITELLM_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-platform-secrets
+              key: LITELLM_MASTER_KEY
+        - name: UI_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: ai-platform-secrets
+              key: UI_USERNAME
+        - name: UI_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ai-platform-secrets
+              key: UI_PASSWORD
         resources:
-          requests:
-            memory: "2Gi"
-            cpu: "500m"
           limits:
-            memory: "3Gi"
-            cpu: "800m"
+            cpu: '4'
+            memory: "4Gi"
+          requests:
+            cpu: 2
+            memory: "2Gi"
         livenessProbe:
+          failureThreshold: 3
           httpGet:
             path: /health/liveliness
             port: 4000
+            scheme: HTTP
           initialDelaySeconds: 30
           periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
         readinessProbe:
+          failureThreshold: 3
           httpGet:
             path: /health/readiness
             port: 4000
+            scheme: HTTP
           initialDelaySeconds: 10
           periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /app/config.yaml
+          name: config
+          subPath: config.yaml
+        - mountPath: /app/data
+          name: litellm-data
       volumes:
-      - name: config
-        configMap:
+      - configMap:
           name: litellm-config
+        name: config
+      - name: litellm-data
+        persistentVolumeClaim:
+          claimName: litellm-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: litellm-data-pvc
+  namespace: ai-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
 ---
 apiVersion: v1
 kind: Service
@@ -68,4 +122,22 @@ spec:
   ports:
   - port: 4000
     targetPort: 4000
-  type: LoadBalancer
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm
+  namespace: ai-platform
+spec:
+  rules:
+  - host: litellm.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 4000

@@ -15,10 +15,7 @@ output "rds_database_name" {
   value = "aiplatform"
 }
 
-output "db_connection_string" {
-  value     = "postgresql://aiplatform:${random_password.db_password.result}@postgres.default.svc.cluster.local:5432/aiplatform"
-  sensitive = true
-}
+
 
 output "s3_bucket" {
   value = aws_s3_bucket.ai_storage.id

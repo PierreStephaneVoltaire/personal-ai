@@ -35,16 +35,9 @@ resource "kubectl_manifest" "litellm" {
   ]
 }
 
-data "kubectl_file_documents" "mcp_rbac" {
-  content = file("${path.module}/k8s/mcp-server-rbac.yaml")
-}
 
-resource "kubectl_manifest" "mcp_rbac" {
-  for_each  = data.kubectl_file_documents.mcp_rbac.manifests
-  yaml_body = each.value
 
-  depends_on = [kubernetes_namespace.ai_platform]
-}
+
 
 data "kubectl_file_documents" "openwebui" {
   content = file("${path.module}/k8s/openwebui.yaml")
@@ -68,8 +61,10 @@ resource "kubectl_manifest" "openwebui" {
 
 data "kubectl_file_documents" "n8n" {
   content = templatefile("${path.module}/k8s/n8n.yaml", {
-    n8n_password = random_password.n8n_password.result
-    n8n_secrets  = var.n8n_secrets
+    n8n_password    = random_password.n8n_password.result
+    n8n_db_password = var.n8n_db_password
+    postgres_host   = var.postgres_host
+    postgres_port   = var.postgres_port
   })
 }
 
@@ -104,18 +99,48 @@ resource "kubernetes_secret" "aws_creds" {
 
 data "kubectl_file_documents" "yt_backup" {
   content = templatefile("${path.module}/k8s/yt-backup.yaml", {
-    yt_backup_image_url    = aws_ecr_repository.yt_backup.repository_url
+    yt_backup_image_url    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${aws_ecr_repository.yt_backup.name}"
     cookies_parameter_name = aws_ssm_parameter.youtube_cookies.name
   })
 }
 
-resource "kubectl_manifest" "yt_backup" {
-  for_each  = data.kubectl_file_documents.yt_backup.manifests
-  yaml_body = each.value
+# resource "kubectl_manifest" "yt_backup" {
+#   for_each  = data.kubectl_file_documents.yt_backup.manifests
+#   yaml_body = each.value
+
+#   depends_on = [
+#     kubernetes_namespace.ai_platform,
+#     kubernetes_secret.aws_creds,
+#     aws_ecr_repository.yt_backup
+#   ]
+# }
+
+# ---------------------------------------------------------------------
+# Discord Bot Service
+# ---------------------------------------------------------------------
+
+resource "kubernetes_secret" "discord_bot_secrets" {
+  metadata {
+    name      = "discord-bot-secrets"
+    namespace = kubernetes_namespace.ai_platform.metadata[0].name
+  }
+
+  data = {
+    DISCORD_TOKEN   = var.discord_token
+    N8N_WEBHOOK_URL = var.n8n_webhook_url
+  }
+
+  type = "Opaque"
+}
+
+resource "kubectl_manifest" "discord_bot" {
+  yaml_body = templatefile("${path.module}/k8s/discord-bot.yaml", {
+    discord_bot_image_url = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${aws_ecr_repository.discord_bot.name}"
+  })
 
   depends_on = [
     kubernetes_namespace.ai_platform,
-    kubernetes_secret.aws_creds,
-    aws_ecr_repository.yt_backup
+    kubernetes_secret.discord_bot_secrets,
+    aws_ecr_repository.discord_bot
   ]
 }

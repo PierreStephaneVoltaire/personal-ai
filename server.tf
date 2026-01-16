@@ -151,18 +151,17 @@ resource "kubernetes_secret" "ai_platform_secrets" {
   }
 
   data = {
-    OPENROUTER_API_KEY = var.openrouter_api_key
-    WEBUI_SECRET_KEY   = random_password.webui_secret_key.result
-    # Point to the local postgres service (deployed in rds.tf)
-    DATABASE_URL          = "postgres://aiplatform:${random_password.db_password.result}@postgres.default.svc.cluster.local:5432/aiplatform"
-    POSTGRES_USER         = "aiplatform"
-    POSTGRES_PASSWORD     = random_password.db_password.result
-    POSTGRES_DB           = "aiplatform"
-    AWS_ACCESS_KEY_ID     = var.aws_access_key
-    AWS_SECRET_ACCESS_KEY = var.aws_secret_key
-    LITELLM_MASTER_KEY    = "sk-${random_password.litellm_master_key.result}"
-    UI_USERNAME           = "admin"
-    UI_PASSWORD           = "sk-${random_password.litellm_master_key.result}"
+    OPENROUTER_API_KEY     = var.openrouter_api_key
+    WEBUI_SECRET_KEY       = random_password.webui_secret_key.result
+    OPENWEBUI_DATABASE_URL = var.openwebui_database_url
+    LITELLM_DATABASE_URL   = replace(var.litellm_database_url, "/@[^@/]+:[0-9]+\\//", "@127.0.0.1:5432/")
+    # Legacy keys if needed, but updated to use new variables
+    DATABASE_URL           = var.openwebui_database_url # Defaulting to openwebui for generic usages
+    AWS_ACCESS_KEY_ID      = var.aws_access_key
+    AWS_SECRET_ACCESS_KEY  = var.aws_secret_key
+    LITELLM_MASTER_KEY     = "sk-${random_password.litellm_master_key.result}"
+    UI_USERNAME            = "admin"
+    UI_PASSWORD            = "sk-${random_password.litellm_master_key.result}"
   }
 
   type = "Opaque"
@@ -213,14 +212,6 @@ resource "kubernetes_config_map" "litellm_config" {
           }
         ]
       )
-      mcp_servers = {
-        kubernetes = {
-          transport        = "stdio"
-          command          = "npx"
-          args             = ["-y", "kubernetes-mcp-server@latest", "--kubeconfig", "/etc/kubernetes/kubeconfig"]
-          require_approval = "never"
-        }
-      }
     })
   }
 }

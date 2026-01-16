@@ -129,17 +129,6 @@ resource "aws_ssm_parameter" "n8n_password" {
   }
 }
 
-resource "aws_ssm_parameter" "n8n_email" {
-  name        = "/${var.project_name}/${var.environment}/n8n/email"
-  description = "n8n admin email"
-  type        = "String"
-  value       = var.email
-
-  tags = {
-    Name        = "n8n-email"
-    Environment = var.environment
-  }
-}
 
 # Outputs
 output "youtube_live_notifications_table" {
@@ -167,10 +156,7 @@ output "n8n_password_parameter" {
   description = "SSM parameter name for n8n password"
 }
 
-output "n8n_email_parameter" {
-  value       = aws_ssm_parameter.n8n_email.name
-  description = "SSM parameter name for n8n email"
-}
+
 
 output "n8n_admin_password" {
   value       = random_password.n8n_password.result

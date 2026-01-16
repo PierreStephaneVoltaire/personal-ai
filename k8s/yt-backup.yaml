@@ -67,8 +67,21 @@ spec:
           periodSeconds: 5
       volumes:
       - name: download-storage
-        emptyDir:
-          sizeLimit: 50Gi
+        persistentVolumeClaim:
+          claimName: yt-backup-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yt-backup-pvc
+  namespace: ai-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 50Gi
 ---
 apiVersion: v1
 kind: Service
