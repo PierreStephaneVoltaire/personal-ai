@@ -28,6 +28,8 @@ spec:
       labels:
         app: openwebui
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: openwebui
         image: ghcr.io/open-webui/open-webui:main
@@ -40,7 +42,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: ai-platform-secrets
-              key: DATABASE_URL
+              key: OPENWEBUI_DATABASE_URL
         - name: WEBUI_SECRET_KEY
           valueFrom:
             secretKeyRef:

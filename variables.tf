@@ -55,6 +55,12 @@ variable "aws_secret_key" {
 
 }
 
+variable "kubeconfig_path" {
+  description = "Path to the kubeconfig file on the host"
+  type        = string
+  default     = "~/.kube/config"
+}
+
 variable "mcp_filesystem_mount_paths" {
   description = "List of host paths to mount into the MCP server container for the filesystem server"
   type        = list(string)

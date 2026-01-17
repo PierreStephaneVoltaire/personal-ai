@@ -9,6 +9,8 @@ import subprocess
 import logging
 import threading
 import uuid
+import json
+import re
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -302,6 +304,133 @@ def job_status(job_id):
 def list_jobs():
     """List all jobs."""
     return jsonify(list(jobs.values()))
+
+
+@app.route('/check-live', methods=['GET'])
+def check_live():
+    """Check if a YouTube channel is live."""
+    channel = request.args.get('channel')
+    if not channel:
+        return jsonify({'error': 'Missing channel parameter'}), 400
+
+    # Sanitize input: allow only alphanumeric, @, _, -
+    if not re.match(r'^[a-zA-Z0-9@_-]+$', channel):
+        return jsonify({'error': 'Invalid channel format'}), 400
+
+    cmd = [
+        'yt-dlp',
+        '--cookies', COOKIES_FILE,
+        '--dump-json',
+        '--skip-download',
+        '--no-playlist',
+        '--socket-timeout', '10',
+        f'https://www.youtube.com/{channel}/live'
+    ]
+
+    checked_at = datetime.now().isoformat()
+
+    try:
+        process = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+
+        stderr = process.stderr.lower() if process.stderr else ""
+
+        # Check for specific errors first
+        if "join this channel" in stderr or "members-only" in stderr:
+            return jsonify({
+                "is_live": False,
+                "stream": None,
+                "error": "members_only_no_access",
+                "checked_at": checked_at
+            })
+
+        if "sign in" in stderr or "cookie" in stderr:
+            return jsonify({
+                "is_live": False,
+                "stream": None,
+                "error": "auth_expired",
+                "detail": "Cookies need refresh",
+                "checked_at": checked_at
+            }), 401
+
+        if "429" in stderr or "too many requests" in stderr:
+            return jsonify({
+                "is_live": False,
+                "stream": None,
+                "error": "Rate limited by YouTube",
+                "checked_at": checked_at
+            }), 429
+
+        if "404" in stderr or "does not exist" in stderr:
+            return jsonify({
+                "is_live": False,
+                "stream": None,
+                "error": "Channel not found",
+                "checked_at": checked_at
+            }), 404
+
+        # Success - Live
+        if process.returncode == 0 and process.stdout:
+            try:
+                data = json.loads(process.stdout)
+                if data.get('is_live'):
+                    # Parse start time
+                    start_ts = data.get('release_timestamp') or data.get('start_time')
+                    start_time = None
+                    if start_ts:
+                        start_time = datetime.fromtimestamp(start_ts).isoformat()
+
+                    return jsonify({
+                        "is_live": True,
+                        "stream": {
+                            "id": data.get("id"),
+                            "title": data.get("title"),
+                            "description": data.get("description"),
+                            "uploader": data.get("uploader"),
+                            "uploader_id": data.get("uploader_id"),
+                            "view_count": data.get("view_count"),
+                            "start_time": start_time,
+                            "thumbnail": data.get("thumbnail")
+                        },
+                        "error": None,
+                        "checked_at": checked_at
+                    })
+            except json.JSONDecodeError:
+                logger.error("Failed to parse yt-dlp JSON output")
+
+        # Success - Offline
+        # Covers: "not currently live", non-zero exit code (if not caught above),
+        # or returncode 0 but is_live=False
+        return jsonify({
+            "is_live": False,
+            "stream": None,
+            "error": None,
+            "checked_at": checked_at
+        })
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"Timeout checking live status for {channel}")
+        return jsonify({
+            "is_live": False,
+            "stream": None,
+            "error": "Failed to check stream status",
+            "detail": "Timeout",
+            "checked_at": checked_at
+        }), 500
+
+    except Exception as e:
+        logger.error(f"Unexpected error checking live status for {channel}: {e}")
+        return jsonify({
+            "is_live": False,
+            "stream": None,
+            "error": "Failed to check stream status",
+            "detail": str(e),
+            "checked_at": checked_at
+        }), 500
 
 
 if __name__ == '__main__':

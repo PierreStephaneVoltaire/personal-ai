@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mcp-secrets
+  namespace: ${namespace}
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "${aws_access_key}"
+  AWS_SECRET_ACCESS_KEY: "${aws_secret_key}"
+  AWS_REGION: "${aws_region}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+  namespace: ${namespace}
+data:
+  MCP_LOG_LEVEL: "info"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: ${namespace}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+    spec:
+      containers:
+      - name: mcp-server
+        image: "${image_url}:latest"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8081
+          name: aws-mcp
+        - containerPort: 8087
+          name: k8s-mcp
+        env:
+        - name: KUBECONFIG
+          value: /root/.kube/config
+        envFrom:
+        - secretRef:
+            name: mcp-secrets
+        - configMapRef:
+            name: mcp-config
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /root/.kube/config
+          readOnly: true
+%{ for i, path in filesystem_mounts ~}
+        - name: fs-mount-${i}
+          mountPath: /mnt/fs/${i}
+%{ endfor ~}
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: ${kubeconfig_path}
+          type: File
+%{ for i, path in filesystem_mounts ~}
+      - name: fs-mount-${i}
+        hostPath:
+          path: ${path}
+          type: Directory
+%{ endfor ~}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: ${namespace}
+spec:
+  selector:
+    app: mcp-server
+  ports:
+  - name: aws-mcp
+    port: 8081
+    targetPort: 8081
+  - name: k8s-mcp
+    port: 8087
+    targetPort: 8087
+  type: ClusterIP

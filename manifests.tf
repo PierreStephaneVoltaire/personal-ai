@@ -144,3 +144,29 @@ resource "kubectl_manifest" "discord_bot" {
     aws_ecr_repository.discord_bot
   ]
 }
+
+# ---------------------------------------------------------------------
+# MCP Server Deployment
+# ---------------------------------------------------------------------
+
+data "kubectl_file_documents" "mcp" {
+  content = templatefile("${path.module}/k8s/mcp.yaml", {
+    namespace         = "ai-platform"
+    aws_access_key    = var.aws_access_key
+    aws_secret_key    = var.aws_secret_key
+    aws_region        = var.aws_region
+    image_url         = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/mcp-server"
+    kubeconfig_path   = var.kubeconfig_path
+    filesystem_mounts = var.mcp_filesystem_mount_paths
+  })
+}
+
+resource "kubectl_manifest" "mcp" {
+  for_each  = data.kubectl_file_documents.mcp.manifests
+  yaml_body = each.value
+
+  depends_on = [
+    kubernetes_namespace.ai_platform,
+    aws_ecr_repository.mcp_server
+  ]
+}
