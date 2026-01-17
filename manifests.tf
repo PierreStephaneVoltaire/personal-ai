@@ -79,43 +79,6 @@ resource "kubectl_manifest" "n8n" {
 }
 
 # ---------------------------------------------------------------------
-# YouTube Backup Service
-# ---------------------------------------------------------------------
-
-# Secret for yt-backup (mirrors aws credentials)
-resource "kubernetes_secret" "aws_creds" {
-  metadata {
-    name      = "n8n-aws-creds"
-    namespace = kubernetes_namespace.ai_platform.metadata[0].name
-  }
-
-  data = {
-    AWS_ACCESS_KEY_ID     = var.aws_access_key
-    AWS_SECRET_ACCESS_KEY = var.aws_secret_key
-  }
-
-  type = "Opaque"
-}
-
-data "kubectl_file_documents" "yt_backup" {
-  content = templatefile("${path.module}/k8s/yt-backup.yaml", {
-    yt_backup_image_url    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${aws_ecr_repository.yt_backup.name}"
-    cookies_parameter_name = aws_ssm_parameter.youtube_cookies.name
-  })
-}
-
-# resource "kubectl_manifest" "yt_backup" {
-#   for_each  = data.kubectl_file_documents.yt_backup.manifests
-#   yaml_body = each.value
-
-#   depends_on = [
-#     kubernetes_namespace.ai_platform,
-#     kubernetes_secret.aws_creds,
-#     aws_ecr_repository.yt_backup
-#   ]
-# }
-
-# ---------------------------------------------------------------------
 # Discord Bot Service
 # ---------------------------------------------------------------------
 

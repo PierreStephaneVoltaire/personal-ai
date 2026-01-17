@@ -96,6 +96,11 @@ resource "random_password" "litellm_master_key" {
   special = false
 }
 
+resource "random_password" "n8n_password" {
+  length  = 32
+  special = true
+}
+
 resource "aws_ssm_parameter" "litellm_master_key" {
   name        = "/${var.project_name}/${var.environment}/litellm/master-key"
   description = "LiteLLM Master Key"
