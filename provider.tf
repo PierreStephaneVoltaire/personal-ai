@@ -32,10 +32,6 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.12"
     }
-    openwebui = {
-      source  = "ncecere/openwebui"
-      version = "~> 2.1.0"
-    }
   }
 }
 

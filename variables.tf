@@ -67,14 +67,10 @@ variable "mcp_filesystem_mount_paths" {
   default     = []
 }
 
-variable "discord_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "n8n_webhook_url" {
-  type      = string
-  sensitive = true
+variable "mcp_filesystem_dir_prefix" {
+  description = "Prefix to strip from the host path when mounting into the container"
+  type        = string
+  default     = ""
 }
 
 # PostgreSQL connection variables
@@ -91,10 +87,6 @@ variable "n8n_db_password" {
 }
 
 variable "n8n_database_url" {
-  sensitive = true
-}
-
-variable "openwebui_database_url" {
   sensitive = true
 }
 

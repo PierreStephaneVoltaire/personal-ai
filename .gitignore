@@ -463,6 +463,7 @@ FodyWeavers.xsd
 !.vscode/extensions.json
 *.code-workspace
 ytbackup
+discord-n8n-bot
 # Local History for Visual Studio Code
 .history/
 

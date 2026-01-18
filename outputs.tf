@@ -15,8 +15,6 @@ output "rds_database_name" {
   value = "aiplatform"
 }
 
-
-
 output "s3_bucket" {
   value = aws_s3_bucket.ai_storage.id
 }
@@ -25,10 +23,6 @@ output "aws_region" {
   value = var.aws_region
 }
 
-output "yt_backup_service_endpoint" {
-  value       = "http://yt-backup.ai-platform.svc.cluster.local:8080"
-  description = "Internal Kubernetes service endpoint for yt-backup"
-}
 
 output "n8n_service_endpoint" {
   value       = "http://n8n.ai-platform.svc.cluster.local:5678"

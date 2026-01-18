@@ -86,11 +86,6 @@ resource "kubernetes_namespace" "ai_platform" {
   }
 }
 
-resource "random_password" "webui_secret_key" {
-  length  = 32
-  special = false
-}
-
 resource "random_password" "litellm_master_key" {
   length  = 32
   special = false
@@ -125,30 +120,6 @@ resource "aws_ssm_parameter" "litellm_ui_password" {
   }
 }
 
-resource "aws_ssm_parameter" "openwebui_email" {
-  name        = "/${var.project_name}/${var.environment}/openwebui/email"
-  description = "OpenWebUI Admin Email"
-  type        = "String"
-  value       = "admin"
-
-  tags = {
-    Name        = "openwebui-email"
-    Environment = var.environment
-  }
-}
-
-resource "aws_ssm_parameter" "openwebui_password" {
-  name        = "/${var.project_name}/${var.environment}/openwebui/password"
-  description = "OpenWebUI Admin Password"
-  type        = "SecureString"
-  value       = "sk-${random_password.litellm_master_key.result}"
-
-  tags = {
-    Name        = "openwebui-password"
-    Environment = var.environment
-  }
-}
-
 resource "kubernetes_secret" "ai_platform_secrets" {
   metadata {
     name      = "ai-platform-secrets"
@@ -157,11 +128,8 @@ resource "kubernetes_secret" "ai_platform_secrets" {
 
   data = {
     OPENROUTER_API_KEY     = var.openrouter_api_key
-    WEBUI_SECRET_KEY       = random_password.webui_secret_key.result
-    OPENWEBUI_DATABASE_URL = var.openwebui_database_url
     LITELLM_DATABASE_URL   = replace(var.litellm_database_url, "/@[^@/]+:[0-9]+\\//", "@127.0.0.1:5432/")
     # Legacy keys if needed, but updated to use new variables
-    DATABASE_URL           = var.openwebui_database_url # Defaulting to openwebui for generic usages
     AWS_ACCESS_KEY_ID      = var.aws_access_key
     AWS_SECRET_ACCESS_KEY  = var.aws_secret_key
     LITELLM_MASTER_KEY     = "sk-${random_password.litellm_master_key.result}"
@@ -205,14 +173,37 @@ resource "kubernetes_config_map" "litellm_config" {
         store_model_in_db = true
         master_key        = "os.environ/LITELLM_MASTER_KEY"
       }
+      litellm_settings = {
+        mcp_aliases = {
+          "fs"         = "filesystem"
+          "aws"        = "aws_docs"
+          "terraform"  = "terraform"
+          "eks"        = "eks"
+          "ecs"        = "ecs"
+          "serverless" = "serverless"
+          "k8s"        = "kubernetes"
+          "cost"       = "cost_explorer"
+          "cloudwatch" = "cloudwatch"
+          "bedrock"    = "bedrock"
+          "pricing"    = "pricing"
+          "billing"    = "billing"
+          "iac"        = "iac"
+          "core"       = "core"
+        }
+      }
+      mcp_servers = {
+        for key, val in var.mcp_servers : key => {
+          url = "http://mcp-server-${key}.ai-platform.svc.cluster.local:${val.port}"
+        }
+      }
       model_list = concat(
         [
           for model in var.litellm_models : {
             model_name = model.model_name
             litellm_params = {
-              model    = "openrouter/${model.model_id}"
-              api_base = "https://openrouter.ai/api/v1"
-              api_key  = "os.environ/OPENROUTER_API_KEY"
+              model    = length(regexall("^ollama/", model.model_id)) > 0 ? model.model_id : "openrouter/${model.model_id}"
+              api_base = length(regexall("^ollama/", model.model_id)) > 0 ? "http://localhost:11434" : "https://openrouter.ai/api/v1"
+              api_key  = length(regexall("^ollama/", model.model_id)) > 0 ? "none" : "os.environ/OPENROUTER_API_KEY"
             }
           }
         ]
