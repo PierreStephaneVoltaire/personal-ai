@@ -1,6 +1,13 @@
-variable "aws_region" {
-  type    = string
-  default = "ca-central-1"
+variable "do_token" {
+  description = "DigitalOcean API token"
+  type        = string
+  sensitive   = true
+}
+
+variable "region" {
+  description = "DigitalOcean region"
+  type        = string
+  default     = "nyc1"
 }
 
 variable "project_name" {
@@ -13,12 +20,29 @@ variable "environment" {
   default = "dev"
 }
 
-
-variable "timezone" {
-  type    = string
-  default = "America/Toronto"
+# AWS Credentials for ECR/Bedrock etc.
+variable "aws_access_key" {
+  type      = string
+  sensitive = true
 }
 
+variable "aws_secret_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "aws_region" {
+  type    = string
+  default = "ca-central-1"
+}
+
+# API Keys
+variable "openrouter_api_key" {
+  type      = string
+  sensitive = true
+}
+
+# LiteLLM Configuration
 variable "litellm_models" {
   type = list(object({
     model_name  = string
@@ -26,74 +50,122 @@ variable "litellm_models" {
     max_tokens  = number
     temperature = number
   }))
+  default = []
 }
 
-variable "openrouter_api_key" {
-  type      = string
-  sensitive = true
-}
-
-
-
-
-
-variable "aws_access_key" {
-
-  type = string
-
-  sensitive = true
-
-}
-
-
-
-variable "aws_secret_key" {
-
-  type = string
-
-  sensitive = true
-
-}
-
-variable "kubeconfig_path" {
-  description = "Path to the kubeconfig file on the host"
+# MCP Configuration
+# Domain Configuration
+variable "domain" {
+  description = "Base domain for services (e.g., barelycompetent.xyz)"
   type        = string
-  default     = "~/.kube/config"
+  default     = "barelycompetent.xyz"
 }
 
-variable "mcp_filesystem_mount_paths" {
-  description = "List of host paths to mount into the MCP server container for the filesystem server"
-  type        = list(string)
-  default     = []
+variable "letsencrypt_email" {
+  description = "Email for Let's Encrypt certificate notifications"
+  type        = string
 }
 
-variable "mcp_filesystem_dir_prefix" {
-  description = "Prefix to strip from the host path when mounting into the container"
+variable "rancher_bootstrap_password" {
+  description = "Bootstrap password for Rancher admin"
+  type        = string
+  sensitive   = true
+  default     = "admin"
+}
+variable "additional_mcps" {
+    description = "Map of MCP servers to deploy"
+
+
+    type = map(object({
+    url=string
+       transport      = string
+          authentication = string
+  }))
+  default = {
+   
+  }
+}
+variable "mcp_servers" {
+  description = "Map of MCP servers to deploy"
+  type = map(object({
+    port    = number
+    command = list(string)
+    args    = list(string)
+    image   = optional(string)
+  }))
+  default = {
+    aws_docs = {
+      port    = 8082
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx awslabs.aws-documentation-mcp-server", "--port", "8082"]
+    }
+    terraform = {
+      port    = 8083
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx awslabs.terraform-mcp-server", "--port", "8083"]
+    }
+    kubernetes = {
+      port    = 8084
+      command = ["kubernetes-mcp-server"]
+      args    = ["--port", "8084", "--disable-multi-cluster", "--stateless"]
+    }
+    #  thinktool = {
+    #   port    = 8085
+    #   command = ["supergateway"]
+    #   args    = [ "--stdio", "npx -y", "@modelcontextprotocol/server-sequential-thinking","--port", "8085"]
+    # }
+    pricing = {
+      port    = 8086
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx awslabs.aws-pricing-mcp-server", "--port", "8086"]
+    }
+    core = {
+      port    = 8087
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx awslabs.core-mcp-server", "--port", "8087"]
+    }
+       time = {
+      port    = 8089
+      command = ["supergateway"]
+      args    = ["--stdio", " uvx mcp-server-time", "--port", "8089"]
+    }
+          fetch = {
+      port    = 8090
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx mcp-server-fetch", "--port", "8090"]
+    }
+           pacman = {
+      port    = 8091
+      command = ["supergateway"]
+      args    = ["--stdio", "uvx mcp-server-pacman", "--port", "8091"]
+    }
+  }
+}
+
+# LibreChat Configuration
+variable "librechat_app_title" {
+  description = "Application title for LibreChat"
+  type        = string
+  default     = "AI Chat Platform"
+}
+
+# n8n Configuration
+variable "n8n_basic_auth_active" {
+  description = "Enable basic auth for n8n"
+  type        = bool
+  default     = false
+}
+
+variable "n8n_basic_auth_user" {
+  description = "Basic auth username for n8n"
   type        = string
   default     = ""
+  sensitive   = true
 }
 
-# PostgreSQL connection variables
-variable "postgres_host" {
-  default = "172.17.0.1"
-}
-
-variable "postgres_port" {
-  default = 5432
-}
-
-variable "n8n_db_password" {
-  sensitive = true
-}
-
-variable "n8n_database_url" {
-  sensitive = true
-}
-
-variable "litellm_database_url" {
-  sensitive = true
-}
-
-variable "jenkins_database_url" {
-  sensitive = true
+variable "n8n_basic_auth_password" {
+  description = "Basic auth password for n8n"
+  type        = string
+  default     = ""
+  sensitive   = true
 }

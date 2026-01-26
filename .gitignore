@@ -503,3 +503,4 @@ terraform.tfvars
 *.csv
 n8n_accessKeys.csv
 Backup-codes-*.txt
+tfplan

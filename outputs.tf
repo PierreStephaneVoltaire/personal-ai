@@ -1,45 +1,67 @@
-output "cluster_name" {
-  value = local.cluster_name
+output "kubeconfig_command" {
+  value = "doctl kubernetes cluster kubeconfig save ${digitalocean_kubernetes_cluster.main.name}"
 }
 
-
-output "k3s_server_ip" {
-  value = "127.0.0.1"
+output "database_uri" {
+  value     = digitalocean_database_cluster.postgres.uri
+  sensitive = true
 }
 
-output "rds_endpoint" {
-  value = "postgres.default.svc.cluster.local"
+output "cluster_endpoint" {
+  value = digitalocean_kubernetes_cluster.main.endpoint
 }
 
-output "rds_database_name" {
-  value = "aiplatform"
+output "gateway_loadbalancer_ip" {
+  description = "Run this command to get the LoadBalancer IP for DNS configuration"
+  value       = "kubectl get gateway main-gateway -n nginx-gateway -o jsonpath='{.status.addresses[0].value}'"
 }
 
-output "s3_bucket" {
-  value = aws_s3_bucket.ai_storage.id
+output "dns_records_needed" {
+  description = "DNS A records to create in Namecheap"
+  value       = <<-EOT
+    After terraform apply, create these A records in Namecheap:
+
+    1. Get the LoadBalancer IP:
+       kubectl get gateway main-gateway -n nginx-gateway -o jsonpath='{.status.addresses[0].value}'
+
+    2. In Namecheap DNS settings for ${var.domain}:
+       - Host: litellm  | Type: A | Value: <LB_IP> | TTL: Automatic
+       - Host: rancher  | Type: A | Value: <LB_IP> | TTL: Automatic
+       - Host: chat     | Type: A | Value: <LB_IP> | TTL: Automatic
+       - Host: n8n      | Type: A | Value: <LB_IP> | TTL: Automatic
+
+    TLS certificates will be automatically provisioned by cert-manager once DNS propagates.
+  EOT
 }
 
-output "aws_region" {
-  value = var.aws_region
+output "parameter_store_paths" {
+  description = "AWS Parameter Store paths for credentials"
+  value = {
+    rancher_bootstrap_password = aws_ssm_parameter.rancher_bootstrap_password.name
+    litellm_master_key         = aws_ssm_parameter.litellm_master_key.name
+    litellm_ui_username        = aws_ssm_parameter.litellm_ui_username.name
+    litellm_ui_password        = aws_ssm_parameter.litellm_ui_password.name
+    librechat_jwt_secret       = aws_ssm_parameter.librechat_jwt_secret.name
+    n8n_encryption_key         = aws_ssm_parameter.n8n_encryption_key.name
+  }
 }
 
-
-output "n8n_service_endpoint" {
-  value       = "http://n8n.ai-platform.svc.cluster.local:5678"
-  description = "Internal Kubernetes service endpoint for n8n"
+output "librechat_url" {
+  description = "URL for LibreChat"
+  value       = "https://chat.${var.domain}"
 }
 
 output "n8n_url" {
-  value       = "http://localhost:30678"
-  description = "External n8n URL"
+  description = "URL for n8n"
+  value       = "https://n8n.${var.domain}"
 }
 
-output "rancher_url" {
-  value       = "https://rancher.local"
-  description = "Rancher UI URL"
-}
-
-output "litellm_master_key_parameter" {
-  value       = aws_ssm_parameter.litellm_master_key.name
-  description = "SSM parameter name for LiteLLM master key"
+output "service_urls" {
+  description = "All service URLs"
+  value = {
+    litellm   = "https://litellm.${var.domain}"
+    librechat = "https://chat.${var.domain}"
+    n8n       = "https://n8n.${var.domain}"
+    rancher   = "https://rancher.${var.domain}"
+  }
 }

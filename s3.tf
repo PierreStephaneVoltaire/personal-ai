@@ -2,7 +2,7 @@ resource "aws_s3_bucket" "ai_storage" {
   bucket = "pv-ai-bucket"
 
   tags = {
-    Name = "${local.cluster_name}-storage"
+    Name = "pv-ai-bucket"
   }
 }
 

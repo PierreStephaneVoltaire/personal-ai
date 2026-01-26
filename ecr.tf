@@ -1,4 +1,3 @@
-
 # ECR Repository for mcp-server
 resource "aws_ecr_repository" "mcp_server" {
   name                 = "mcp-server"
@@ -11,6 +10,8 @@ resource "aws_ecr_repository" "mcp_server" {
   tags = {
     Name        = "mcp-server"
     Environment = var.environment
+    Project     = "ai-platform"
+    ManagedBy   = "Terraform"
   }
 }
 
