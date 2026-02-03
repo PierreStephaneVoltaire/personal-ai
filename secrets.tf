@@ -111,13 +111,13 @@ resource "kubernetes_secret" "n8n_secrets" {
   }
 
   data = {
-    N8N_ENCRYPTION_KEY              = data.aws_ssm_parameter.n8n_encryption_key.value
-    N8N_USER_MANAGEMENT_JWT_SECRET  = data.aws_ssm_parameter.n8n_jwt_secret.value
-    DB_POSTGRESDB_DATABASE          = digitalocean_database_db.n8n.name
-    DB_POSTGRESDB_HOST              = digitalocean_database_cluster.postgres.host
-    DB_POSTGRESDB_PORT              = tostring(digitalocean_database_cluster.postgres.port)
-    DB_POSTGRESDB_USER              = digitalocean_database_cluster.postgres.user
-    DB_POSTGRESDB_PASSWORD          = digitalocean_database_cluster.postgres.password
+    N8N_ENCRYPTION_KEY             = data.aws_ssm_parameter.n8n_encryption_key.value
+    N8N_USER_MANAGEMENT_JWT_SECRET = data.aws_ssm_parameter.n8n_jwt_secret.value
+    DB_POSTGRESDB_DATABASE         = digitalocean_database_db.n8n.name
+    DB_POSTGRESDB_HOST             = digitalocean_database_cluster.postgres.host
+    DB_POSTGRESDB_PORT             = tostring(digitalocean_database_cluster.postgres.port)
+    DB_POSTGRESDB_USER             = digitalocean_database_cluster.postgres.user
+    DB_POSTGRESDB_PASSWORD         = digitalocean_database_cluster.postgres.password
   }
 
   type = "Opaque"

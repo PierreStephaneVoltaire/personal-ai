@@ -50,9 +50,13 @@ resource "helm_release" "rancher" {
     value = "false"
   }
 
+  set {
+    name  = "nodeSelector.workload-type"
+    value = "system"
+  }
+
   depends_on = [helm_release.cert_manager]
 }
-
 
 
 # 4. Metrics Server

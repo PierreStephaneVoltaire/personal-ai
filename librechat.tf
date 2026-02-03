@@ -27,27 +27,27 @@ resource "kubernetes_config_map" "librechat_config" {
     "librechat.yaml" = yamlencode({
       version = "1.1.5"
       cache   = true
-      
+
       # Interface configuration
       interface = {
         privacyPolicy = {
-          externalUrl    = "https://chat.${var.domain}/privacy"
-          openNewTab     = true
+          externalUrl = "https://chat.${var.domain}/privacy"
+          openNewTab  = true
         }
         termsOfService = {
-          externalUrl    = "https://chat.${var.domain}/terms"
-          openNewTab     = true
+          externalUrl = "https://chat.${var.domain}/terms"
+          openNewTab  = true
         }
         # Enable UI features
-        modelSelect  = true
-        parameters   = true
-        sidePanel    = true
-        prompts      = true
-        bookmarks    = true
-        multiConvo   = true
-        agents       = true
-        runCode      = true
-        fileSearch   = true
+        modelSelect = true
+        parameters  = true
+        sidePanel   = true
+        prompts     = true
+        bookmarks   = true
+        multiConvo  = true
+        agents      = true
+        runCode     = true
+        fileSearch  = true
       }
 
       # Registration and authentication
@@ -85,9 +85,9 @@ resource "kubernetes_config_map" "librechat_config" {
       fileConfig = {
         endpoints = {
           assistants = {
-            fileLimit          = 10
-            fileSizeLimit      = 10
-            totalSizeLimit     = 100
+            fileLimit      = 10
+            fileSizeLimit  = 10
+            totalSizeLimit = 100
             supportedMimeTypes = [
               # Code files
               "text/x-typescript",
@@ -146,16 +146,9 @@ resource "kubernetes_config_map" "librechat_config" {
 
       # MCP Settings - allowed domains for MCP server connections
       mcpSettings = {
-        allowedDomains = [
-          # Your domain and subdomains
-          "${var.domain}",
-          "*.${var.domain}",
+        allowedDomains = [      
           # Kubernetes internal services
-          "*.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local",
-          "*.svc.cluster.local",
-          # Local services
-          "localhost",
-          "127.0.0.1"
+          "*.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local"
         ]
       }
 
@@ -167,12 +160,13 @@ resource "kubernetes_config_map" "librechat_config" {
             type = "sse"
             url  = "http://mcp-server-${replace(key, "_", "-")}.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local:${val.port}/sse"
           }
-         
+
         },
         {
           # STDIO type servers (run in container)
           sequential_thinking = {
             type    = "stdio"
+            startup = false  # Disable auto-start to prevent OAuth reconnect issues
             command = "npx"
             args = [
               "-y",
@@ -180,9 +174,10 @@ resource "kubernetes_config_map" "librechat_config" {
             ]
             serverInstructions = "Use this server for complex reasoning and step-by-step problem solving"
           }
-      
+
           finance_tools = {
             type    = "stdio"
+            startup = false  # Disable auto-start to prevent OAuth reconnect issues
             command = "uvx"
             args    = ["finance-tools-mcp"]
           }
@@ -204,13 +199,24 @@ resource "kubernetes_config_map" "librechat_config" {
           userWindowInMs = 60000
         }
       }
+
+      # Memory configuration
+      memory = {
+        disabled          = false
+        messageWindowSize = 5
+        personalize       = true
+        agent = {
+          provider = "LiteLLM"
+          model    = "gpt-5.2-codex"
+        }
+      }
     })
   }
 }
 
 resource "kubernetes_deployment" "librechat" {
   depends_on = [kubernetes_service.mongodb]
-  
+
   lifecycle {
     replace_triggered_by = [kubernetes_config_map.librechat_config]
   }
@@ -225,7 +231,7 @@ resource "kubernetes_deployment" "librechat" {
 
   spec {
     replicas = 1
-    
+
     selector {
       match_labels = {
         app = "librechat"
@@ -240,6 +246,17 @@ resource "kubernetes_deployment" "librechat" {
       }
 
       spec {
+        node_selector = {
+          "workload-type" = "general"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "general"
+          effect   = "NoSchedule"
+        }
+
         container {
           name              = "librechat"
           image             = "ghcr.io/danny-avila/librechat:latest"
@@ -262,7 +279,7 @@ resource "kubernetes_deployment" "librechat" {
           }
 
           env {
-            name  = "MONGO_URI"
+            name = "MONGO_URI"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.librechat_secrets.metadata[0].name
@@ -361,7 +378,7 @@ resource "kubernetes_deployment" "librechat" {
             name  = "ALLOW_SOCIAL_REGISTRATION"
             value = "false"
           }
- 
+
           env {
             name  = "DEBUG_LOGGING"
             value = "false"
@@ -379,12 +396,12 @@ resource "kubernetes_deployment" "librechat" {
 
           resources {
             requests = {
-              memory = "1Gi"
-              cpu    = "500m"
+              memory = "256Mi"
+              cpu    = "50m"
             }
             limits = {
-              memory = "2Gi"
-              cpu    = "1000m"
+              memory = "1024Mi"
+              cpu    = "800m"
             }
           }
 

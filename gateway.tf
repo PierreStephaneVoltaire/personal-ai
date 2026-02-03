@@ -16,6 +16,7 @@ resource "kubectl_manifest" "gateway_api_crds" {
 
   server_side_apply = true
   wait              = true
+  force_conflicts   = true
 }
 
 # 2. NGINX Gateway Fabric Helm Release
@@ -31,6 +32,19 @@ resource "helm_release" "nginx_gateway_fabric" {
     name  = "service.type"
     value = "LoadBalancer"
   }
+
+  # Enable SnippetsFilter feature
+  set {
+    name  = "nginxGateway.snippetsFilters.enable"
+    value = "true"
+  }
+
+
+  # Configure rate limiting zone in http context (DISABLED)
+  # set {
+  #   name  = "nginx.config.http.snippets"
+  #   value = "limit_req_zone $binary_remote_addr zone=global_limit:10m rate=10r/s;"
+  # }
 
   depends_on = [kubectl_manifest.gateway_api_crds]
 }
@@ -132,6 +146,24 @@ resource "kubectl_manifest" "main_gateway" {
   depends_on = [helm_release.nginx_gateway_fabric, kubectl_manifest.letsencrypt_issuer]
 }
 
+# SnippetsFilter to inject Authorization header for MCP requests
+resource "kubectl_manifest" "mcp_auth_filter" {
+  yaml_body = <<-YAML
+    apiVersion: gateway.nginx.org/v1alpha1
+    kind: SnippetsFilter
+    metadata:
+      name: mcp-auth-filter
+      namespace: ${kubernetes_namespace.ai_platform.metadata[0].name}
+    spec:
+      snippets:
+      - context: http.server.location
+        value: |
+          proxy_set_header Authorization "Bearer ${data.aws_ssm_parameter.litellm_master_key.value}";
+  YAML
+
+  depends_on = [helm_release.nginx_gateway_fabric]
+}
+
 # 5. HTTPRoute for LiteLLM
 resource "kubectl_manifest" "litellm_route" {
   yaml_body = <<-YAML
@@ -147,12 +179,27 @@ resource "kubectl_manifest" "litellm_route" {
       hostnames:
       - litellm.${var.domain}
       rules:
+      # MCP endpoint - with auth header injection
+      - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+        filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: gateway.nginx.org
+            kind: SnippetsFilter
+            name: mcp-auth-filter
+        backendRefs:
+        - name: litellm
+          port: 4000
+      # All other requests
       - backendRefs:
         - name: litellm
           port: 4000
   YAML
 
-  depends_on = [kubectl_manifest.main_gateway, kubernetes_service.litellm]
+  depends_on = [kubectl_manifest.main_gateway, kubernetes_service.litellm, kubectl_manifest.mcp_auth_filter]
 }
 
 # 6. HTTPRoute for Rancher

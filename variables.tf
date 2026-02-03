@@ -73,16 +73,16 @@ variable "rancher_bootstrap_password" {
   default     = "admin"
 }
 variable "additional_mcps" {
-    description = "Map of MCP servers to deploy"
+  description = "Map of MCP servers to deploy"
 
 
-    type = map(object({
-    url=string
-       transport      = string
-          authentication = string
+  type = map(object({
+    url            = string
+    transport      = string
+    authentication = string
   }))
   default = {
-   
+
   }
 }
 variable "mcp_servers" {
@@ -93,53 +93,6 @@ variable "mcp_servers" {
     args    = list(string)
     image   = optional(string)
   }))
-  default = {
-    aws_docs = {
-      port    = 8082
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx awslabs.aws-documentation-mcp-server", "--port", "8082"]
-    }
-    terraform = {
-      port    = 8083
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx awslabs.terraform-mcp-server", "--port", "8083"]
-    }
-    kubernetes = {
-      port    = 8084
-      command = ["kubernetes-mcp-server"]
-      args    = ["--port", "8084", "--disable-multi-cluster", "--stateless"]
-    }
-    #  thinktool = {
-    #   port    = 8085
-    #   command = ["supergateway"]
-    #   args    = [ "--stdio", "npx -y", "@modelcontextprotocol/server-sequential-thinking","--port", "8085"]
-    # }
-    pricing = {
-      port    = 8086
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx awslabs.aws-pricing-mcp-server", "--port", "8086"]
-    }
-    core = {
-      port    = 8087
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx awslabs.core-mcp-server", "--port", "8087"]
-    }
-       time = {
-      port    = 8089
-      command = ["supergateway"]
-      args    = ["--stdio", " uvx mcp-server-time", "--port", "8089"]
-    }
-          fetch = {
-      port    = 8090
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx mcp-server-fetch", "--port", "8090"]
-    }
-           pacman = {
-      port    = 8091
-      command = ["supergateway"]
-      args    = ["--stdio", "uvx mcp-server-pacman", "--port", "8091"]
-    }
-  }
 }
 
 # LibreChat Configuration

@@ -11,7 +11,7 @@ resource "kubernetes_persistent_volume_claim" "mongodb_data" {
     access_modes = ["ReadWriteOnce"]
     resources {
       requests = {
-        storage = "10Gi"
+        storage = "5Gi"
       }
     }
   }
@@ -28,7 +28,7 @@ resource "kubernetes_deployment" "mongodb" {
 
   spec {
     replicas = 1
-    
+
     selector {
       match_labels = {
         app = "mongodb"
@@ -43,6 +43,17 @@ resource "kubernetes_deployment" "mongodb" {
       }
 
       spec {
+        node_selector = {
+          "workload-type" = "ai-services"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "ai-services"
+          effect   = "NoSchedule"
+        }
+
         container {
           name              = "mongodb"
           image             = "mongo:7"
@@ -73,39 +84,37 @@ resource "kubernetes_deployment" "mongodb" {
             value = "librechat"
           }
 
-          resources {
-            requests = {
-              memory = "512Mi"
-              cpu    = "250m"
-            }
-            limits = {
-              memory = "1Gi"
-              cpu    = "500m"
-            }
+        resources {
+          requests = {
+            memory = "512Mi"     
+            cpu    = "50m"       
           }
-
-          liveness_probe {
-            exec {
-              command = ["mongosh", "--eval", "db.adminCommand('ping')"]
-            }
-            initial_delay_seconds = 30
-            period_seconds        = 10
-            failure_threshold     = 3
-            success_threshold     = 1
-            timeout_seconds       = 5
+          limits = {
+            memory = "1Gi"       
+            cpu    = "1000m"      
           }
+        }
 
-          readiness_probe {
-            exec {
-              command = ["mongosh", "--eval", "db.adminCommand('ping')"]
-            }
-            initial_delay_seconds = 10
-            period_seconds        = 5
-            failure_threshold     = 3
-            success_threshold     = 1
-            timeout_seconds       = 5
-          }
+        
+liveness_probe {
+  exec {
+    command = ["mongosh", "--eval", "db.adminCommand('ping')"]
+  }
+  initial_delay_seconds = 60        # Increased from 30
+  period_seconds        = 15        # Increased from 10
+  failure_threshold     = 5         # Increased from 3
+  timeout_seconds       = 10        # Increased from 5
+}
 
+readiness_probe {
+  exec {
+    command = ["mongosh", "--eval", "db.adminCommand('ping')"]
+  }
+  initial_delay_seconds = 30        # Increased from 10
+  period_seconds        = 10        # Increased from 5
+  failure_threshold     = 5         # Increased from 3
+  timeout_seconds       = 10        # Increased from 5
+}
           volume_mount {
             mount_path = "/data/db"
             name       = "mongodb-data"

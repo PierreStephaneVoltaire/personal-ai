@@ -24,16 +24,16 @@ resource "kubernetes_config_map" "litellm_config" {
       general_settings = {
         store_model_in_db           = true
         store_prompts_in_spend_logs = true
-        default_fallbacks = ["general"]
-        cache = true
-        cache_params = { type = "local" }
-    #         s3_bucket_name: cache-bucket-litellm # AWS Bucket Name for S3
-    # s3_region_name: us-west-2 # AWS Region Name for S3
-    # s3_aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID # us os.environ/<variable name> to pass environment variables. This is AWS Access Key ID for S3
-    # s3_aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY # AWS Secret Access Key for S3
-    # s3_endpoint_url: https://s3.amazonaws.com # [OPTIONAL] S3 endpoint URL, if you want to use Backblaze/cloudflare s3 bucket
+        default_fallbacks           = ["general"]
+        cache                       = true
+        cache_params                = { type = "local" }
+        #         s3_bucket_name: cache-bucket-litellm # AWS Bucket Name for S3
+        # s3_region_name: us-west-2 # AWS Region Name for S3
+        # s3_aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID # us os.environ/<variable name> to pass environment variables. This is AWS Access Key ID for S3
+        # s3_aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY # AWS Secret Access Key for S3
+        # s3_endpoint_url: https://s3.amazonaws.com # [OPTIONAL] S3 endpoint URL, if you want to use Backblaze/cloudflare s3 bucket
 
-        master_key                  = "os.environ/LITELLM_MASTER_KEY"
+        master_key = "os.environ/LITELLM_MASTER_KEY"
         # vector_db_type              = "pgvector"
         # vector_db_url               = "os.environ/DATABASE_URL"
 
@@ -56,23 +56,23 @@ resource "kubernetes_config_map" "litellm_config" {
           "core"       = "core"
         }
         enable_semantic_cache = true
-        cache_ttl            = 3600
+        cache_ttl             = 3600
       }
       mcp_servers = merge({
         for key, val in var.mcp_servers : key => {
-          url            = "http://mcp-server-${replace(key,"_","-")}.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local:${val.port}/sse"
-          transport      = "sse"
-          authentication = "None"
+          url       = "http://mcp-server-${replace(key, "_", "-")}.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local:${val.port}/sse"
+          transport = "sse"
+          startup   = false
         }
-      },var.additional_mcps)
+      }, var.additional_mcps)
       model_list = concat(
         [
           for model in var.litellm_models : {
             model_name = model.model_name
             litellm_params = {
-              model    =  "openrouter/${model.model_id}"
-              api_base =   "https://openrouter.ai/api/v1"
-              api_key  =  "os.environ/OPENROUTER_API_KEY"
+              model    = "openrouter/${model.model_id}"
+              api_base = "https://openrouter.ai/api/v1"
+              api_key  = "os.environ/OPENROUTER_API_KEY"
             }
           }
         ]
@@ -107,6 +107,17 @@ resource "kubernetes_deployment" "litellm" {
         }
       }
       spec {
+        node_selector = {
+          "workload-type" = "ai-services"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "ai-services"
+          effect   = "NoSchedule"
+        }
+
         container {
           name              = "litellm"
           image             = "ghcr.io/berriai/litellm:main-latest"
@@ -140,6 +151,7 @@ resource "kubernetes_deployment" "litellm" {
             name  = "OPENAI_API_KEY"
             value = "dummy-key"
           }
+  
           env {
             name = "LITELLM_MASTER_KEY"
             value_from {
@@ -170,7 +182,12 @@ resource "kubernetes_deployment" "litellm" {
 
           resources {
             requests = {
+              memory = "1Gi"
+              cpu    = "10m"
+            }
+            limits = {
               memory = "2Gi"
+              cpu    = "1000m"
             }
           }
 
@@ -179,6 +196,10 @@ resource "kubernetes_deployment" "litellm" {
               path   = "/health/liveliness"
               port   = 4000
               scheme = "HTTP"
+              http_header {
+                name  = "Authorization"
+                value = "Bearer ${data.aws_ssm_parameter.litellm_master_key.value}"
+              }
             }
             initial_delay_seconds = 30
             period_seconds        = 10
@@ -192,6 +213,10 @@ resource "kubernetes_deployment" "litellm" {
               path   = "/health/readiness"
               port   = 4000
               scheme = "HTTP"
+              http_header {
+                name  = "Authorization"
+                value = "Bearer ${data.aws_ssm_parameter.litellm_master_key.value}"
+              }
             }
             initial_delay_seconds = 10
             period_seconds        = 5

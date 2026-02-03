@@ -15,6 +15,7 @@ resource "null_resource" "mcp_build" {
   provisioner "local-exec" {
     working_dir = "${path.module}/packer"
     command     = <<EOT
+      aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
       packer init build.pkr.hcl
       packer build -var "image_repository=${aws_ecr_repository.mcp_server.repository_url}" -var "image_tag=${local.mcp_build_trigger}" build.pkr.hcl
     EOT

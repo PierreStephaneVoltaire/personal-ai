@@ -11,7 +11,7 @@ resource "kubernetes_persistent_volume_claim" "n8n_data" {
     access_modes = ["ReadWriteOnce"]
     resources {
       requests = {
-        storage = "10Gi"
+        storage = "5Gi"
       }
     }
   }
@@ -28,7 +28,7 @@ resource "kubernetes_deployment" "n8n" {
 
   spec {
     replicas = 1
-    
+
     selector {
       match_labels = {
         app = "n8n"
@@ -43,6 +43,17 @@ resource "kubernetes_deployment" "n8n" {
       }
 
       spec {
+        node_selector = {
+          "workload-type" = "general"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "general"
+          effect   = "NoSchedule"
+        }
+
         security_context {
           fs_group = 1000
         }
@@ -264,12 +275,12 @@ resource "kubernetes_deployment" "n8n" {
 
           resources {
             requests = {
-              memory = "1Gi"
-              cpu    = "500m"
+              memory = "0.5Gi"
+              cpu    = "50m"
             }
             limits = {
-              memory = "2Gi"
-              cpu    = "1000m"
+              memory = "1Gi"
+              cpu    = "500m"
             }
           }
 
