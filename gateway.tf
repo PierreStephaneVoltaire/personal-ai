@@ -138,6 +138,15 @@ resource "kubectl_manifest" "main_gateway" {
           certificateRefs:
           - name: n8n-tls
             kind: Secret
+      - name: https-stoat
+        port: 443
+        protocol: HTTPS
+        hostname: notdiscord.${var.domain}
+        tls:
+          mode: Terminate
+          certificateRefs:
+          - name: stoat-tls
+            kind: Secret      
         allowedRoutes:
           namespaces:
             from: All
