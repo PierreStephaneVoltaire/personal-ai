@@ -24,19 +24,15 @@ resource "kubernetes_config_map" "litellm_config" {
       general_settings = {
         store_model_in_db           = true
         store_prompts_in_spend_logs = true
-        default_fallbacks           = ["general"]
+        default_fallbacks           = ["kimi-k2.5"]
         cache                       = true
         cache_params                = { type = "local" }
-        #         s3_bucket_name: cache-bucket-litellm # AWS Bucket Name for S3
-        # s3_region_name: us-west-2 # AWS Region Name for S3
-        # s3_aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID # us os.environ/<variable name> to pass environment variables. This is AWS Access Key ID for S3
-        # s3_aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY # AWS Secret Access Key for S3
-        # s3_endpoint_url: https://s3.amazonaws.com # [OPTIONAL] S3 endpoint URL, if you want to use Backblaze/cloudflare s3 bucket
-
-        master_key = "os.environ/LITELLM_MASTER_KEY"
-        # vector_db_type              = "pgvector"
-        # vector_db_url               = "os.environ/DATABASE_URL"
-
+        master_key                  = "os.environ/LITELLM_MASTER_KEY"
+      }
+      router_settings = {
+        enable_tag_filtering = true
+        routing_strategy = "simple-shuffle"
+        tag_filtering_match_any: false
       }
       litellm_settings = {
         mcp_aliases = {
@@ -67,17 +63,48 @@ resource "kubernetes_config_map" "litellm_config" {
       }, var.additional_mcps)
       model_list = concat(
         [
-          for model in var.litellm_models : {
-            model_name = model.model_name
-            litellm_params = {
-              model    = "openrouter/${model.model_id}"
-              api_base = "https://openrouter.ai/api/v1"
-              api_key  = "os.environ/OPENROUTER_API_KEY"
-            }
-          }
-        ]
+          for model in var.litellm_models : merge(
+            {
+              model_name = model.model_name
+              litellm_params = {
+                model    = "openrouter/${model.model_id}"
+                api_base = "https://openrouter.ai/api/v1"
+                api_key  = "os.environ/OPENROUTER_API_KEY"
+                  max_tokens        = model.max_tokens
+    temperature       = model.temperature
+    top_p             = model.top_p
+              }
+            },
+            length(model.tags) > 0 ? {
+              model_info = {
+                tags = model.tags
+              }
+            } : {}
+          )
+        ],
+           [
+          for model in var.litellm_models : merge(
+            {
+              model_name = "auto"
+              litellm_params = {
+                model    = "openrouter/${model.model_id}"
+                api_base = "https://openrouter.ai/api/v1"
+                api_key  = "os.environ/OPENROUTER_API_KEY"
+                  max_tokens        = model.max_tokens
+    temperature       = model.temperature
+    top_p             = model.top_p
+              }
+            },
+            length(model.tags) > 0 ? {
+              model_info = {
+                tags = model.tags
+              }
+            } : {}
+          )
+        ],
       )
     })
+
   }
 }
 

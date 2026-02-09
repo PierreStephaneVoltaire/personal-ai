@@ -45,10 +45,15 @@ variable "openrouter_api_key" {
 # LiteLLM Configuration
 variable "litellm_models" {
   type = list(object({
-    model_name  = string
-    model_id    = string
-    max_tokens  = number
-    temperature = number
+    model_name        = string
+    model_id          = string
+    max_tokens        = number
+    temperature       = number
+    top_p             = optional(number)
+    frequency_penalty = optional(number)
+    presence_penalty  = optional(number)
+    reasoning_effort  = optional(string)
+    tags              = optional(list(string), [])
   }))
   default = []
 }

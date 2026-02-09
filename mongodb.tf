@@ -44,13 +44,13 @@ resource "kubernetes_deployment" "mongodb" {
 
       spec {
         node_selector = {
-          "workload-type" = "ai-services"
+          "workload-type" = "general"
         }
 
         toleration {
           key      = "dedicated"
           operator = "Equal"
-          value    = "ai-services"
+          value    = "general"
           effect   = "NoSchedule"
         }
 

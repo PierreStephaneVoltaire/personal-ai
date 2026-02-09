@@ -28,9 +28,11 @@ resource "digitalocean_kubernetes_cluster" "main" {
 resource "digitalocean_kubernetes_node_pool" "ai_services_pool" {
   cluster_id = digitalocean_kubernetes_cluster.main.id
   name       = "ai-services-pool"
-  size       = "s-4vcpu-8gb"
+  size       = "s-2vcpu-4gb"
   node_count = 1
-  auto_scale = false
+  auto_scale = true
+  min_nodes = 0
+  max_nodes = 2
   labels = {
     "workload-type" = "ai-services"
   }
@@ -44,11 +46,11 @@ resource "digitalocean_kubernetes_node_pool" "ai_services_pool" {
 resource "digitalocean_kubernetes_node_pool" "general_pool" {
   cluster_id = digitalocean_kubernetes_cluster.main.id
   name       = "general-pool"
-  size       = "s-4vcpu-8gb"
+  size       = "s-2vcpu-4gb"
   node_count = 1
   auto_scale = true
   min_nodes = 0
-  max_nodes = 1
+  max_nodes = 4
   labels = {
     "workload-type" = "general"
   }
