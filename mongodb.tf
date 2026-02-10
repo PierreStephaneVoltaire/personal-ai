@@ -84,37 +84,37 @@ resource "kubernetes_deployment" "mongodb" {
             value = "librechat"
           }
 
-        resources {
-          requests = {
-            memory = "512Mi"     
-            cpu    = "50m"       
+          resources {
+            requests = {
+              memory = "512Mi"
+              cpu    = "50m"
+            }
+            limits = {
+              memory = "1Gi"
+              cpu    = "1000m"
+            }
           }
-          limits = {
-            memory = "1Gi"       
-            cpu    = "1000m"      
+
+
+          liveness_probe {
+            exec {
+              command = ["mongosh", "--eval", "db.adminCommand('ping')"]
+            }
+            initial_delay_seconds = 60 # Increased from 30
+            period_seconds        = 15 # Increased from 10
+            failure_threshold     = 5  # Increased from 3
+            timeout_seconds       = 10 # Increased from 5
           }
-        }
 
-        
-liveness_probe {
-  exec {
-    command = ["mongosh", "--eval", "db.adminCommand('ping')"]
-  }
-  initial_delay_seconds = 60        # Increased from 30
-  period_seconds        = 15        # Increased from 10
-  failure_threshold     = 5         # Increased from 3
-  timeout_seconds       = 10        # Increased from 5
-}
-
-readiness_probe {
-  exec {
-    command = ["mongosh", "--eval", "db.adminCommand('ping')"]
-  }
-  initial_delay_seconds = 30        # Increased from 10
-  period_seconds        = 10        # Increased from 5
-  failure_threshold     = 5         # Increased from 3
-  timeout_seconds       = 10        # Increased from 5
-}
+          readiness_probe {
+            exec {
+              command = ["mongosh", "--eval", "db.adminCommand('ping')"]
+            }
+            initial_delay_seconds = 30 # Increased from 10
+            period_seconds        = 10 # Increased from 5
+            failure_threshold     = 5  # Increased from 3
+            timeout_seconds       = 10 # Increased from 5
+          }
           volume_mount {
             mount_path = "/data/db"
             name       = "mongodb-data"

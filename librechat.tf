@@ -146,7 +146,7 @@ resource "kubernetes_config_map" "librechat_config" {
 
       # MCP Settings - allowed domains for MCP server connections
       mcpSettings = {
-        allowedDomains = [      
+        allowedDomains = [
           # Kubernetes internal services
           "*.${kubernetes_namespace.ai_platform.metadata[0].name}.svc.cluster.local"
         ]
@@ -166,7 +166,7 @@ resource "kubernetes_config_map" "librechat_config" {
           # STDIO type servers (run in container)
           sequential_thinking = {
             type    = "stdio"
-            startup = false  # Disable auto-start to prevent OAuth reconnect issues
+            startup = false # Disable auto-start to prevent OAuth reconnect issues
             command = "npx"
             args = [
               "-y",
@@ -177,7 +177,7 @@ resource "kubernetes_config_map" "librechat_config" {
 
           finance_tools = {
             type    = "stdio"
-            startup = false  # Disable auto-start to prevent OAuth reconnect issues
+            startup = false # Disable auto-start to prevent OAuth reconnect issues
             command = "uvx"
             args    = ["finance-tools-mcp"]
           }

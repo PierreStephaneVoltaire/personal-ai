@@ -138,6 +138,9 @@ resource "kubectl_manifest" "main_gateway" {
           certificateRefs:
           - name: n8n-tls
             kind: Secret
+        allowedRoutes:
+          namespaces:
+            from: All
       - name: https-stoat
         port: 443
         protocol: HTTPS

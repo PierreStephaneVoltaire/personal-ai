@@ -31,8 +31,8 @@ resource "digitalocean_kubernetes_node_pool" "ai_services_pool" {
   size       = "s-2vcpu-4gb"
   node_count = 1
   auto_scale = true
-  min_nodes = 0
-  max_nodes = 2
+  min_nodes  = 0
+  max_nodes  = 2
   labels = {
     "workload-type" = "ai-services"
   }
@@ -49,8 +49,8 @@ resource "digitalocean_kubernetes_node_pool" "general_pool" {
   size       = "s-2vcpu-4gb"
   node_count = 1
   auto_scale = true
-  min_nodes = 0
-  max_nodes = 4
+  min_nodes  = 0
+  max_nodes  = 4
   labels = {
     "workload-type" = "general"
   }

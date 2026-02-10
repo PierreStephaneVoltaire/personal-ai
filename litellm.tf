@@ -30,9 +30,9 @@ resource "kubernetes_config_map" "litellm_config" {
         master_key                  = "os.environ/LITELLM_MASTER_KEY"
       }
       router_settings = {
-        enable_tag_filtering = true
-        routing_strategy = "simple-shuffle"
-        tag_filtering_match_any: false
+        enable_tag_filtering    = true
+        routing_strategy        = "simple-shuffle"
+        tag_filtering_match_any = false
       }
       litellm_settings = {
         mcp_aliases = {
@@ -62,49 +62,535 @@ resource "kubernetes_config_map" "litellm_config" {
         }
       }, var.additional_mcps)
       model_list = concat(
+        flatten([
+
+          for model in var.litellm_models : flatten(
+
+
+
+            [
+
+              # Special case: if classifier tag is present, create "classifier" group entries
+              contains(model.tags, "classifier") ? [
+                {
+                  model_name = "classifier"
+                  litellm_params = {
+                    model       = "openrouter/${model.model_id}"
+                    api_base    = "https://openrouter.ai/api/v1"
+                    api_key     = "os.environ/OPENROUTER_API_KEY"
+                    max_tokens  = model.max_tokens
+                    temperature = model.temperature
+                    top_p       = try(model.top_p, 0.9)
+                  }
+                }
+              ] : [],
+
+              # Generate ALL qualifying groups for each tier - models can appear in multiple groups
+              # This creates duplicate entries for load balancing when a model qualifies for multiple groups
+              flatten([
+                for tier in [for t in ["tier1", "tier2", "tier3", "tier4"] : t if contains(model.tags, t)] :
+                [
+                  for item in [
+                    # TOOLS-REQUIRED FLOWS (models WITH tools tag)
+                    # breakglass-tier4: Tier4 with tools tag
+                    tier == "tier4" && contains(model.tags, "tools") ? {
+                      model_name = "breakglass-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # architect-role-tier4: Tier4 with tools + thinking (NOT programming)
+                    tier == "tier4" && contains(model.tags, "tools") && contains(model.tags, "thinking") && !contains(model.tags, "programming") ? {
+                      model_name = "architect-role-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # python-coder-tier4: Tier4 with tools + programming
+                    tier == "tier4" && contains(model.tags, "tools") && contains(model.tags, "programming") ? {
+                      model_name = "python-coder-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # python-coder-tier3: Tier3 with tools + programming
+                    tier == "tier3" && contains(model.tags, "tools") && contains(model.tags, "programming") ? {
+                      model_name = "python-coder-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # devops-engineer-tier3: Tier3 with tools + general (NOT programming)
+                    tier == "tier3" && contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "devops-engineer-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # python-coder-tier2: Tier2 with tools + programming
+                    tier == "tier2" && contains(model.tags, "tools") && contains(model.tags, "programming") ? {
+                      model_name = "python-coder-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # command-executor-tier2: Tier2 with tools + general (NOT programming)
+                    tier == "tier2" && contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "command-executor-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # researcher-tier2: Tier2 with tools + general (NOT programming) - same as command-executor but for research
+                    tier == "tier2" && contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "researcher-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # NO-TOOLS FLOWS (models WITHOUT tools tag)
+                    # social-tier1: Tier1 with general OR social OR creative tags (NO tools)
+                    tier == "tier1" && !contains(model.tags, "tools") && (contains(model.tags, "general") || contains(model.tags, "social") || contains(model.tags, "creative")) ? {
+                      model_name = "social-tier1"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # simple-tier1: Tier1 with general tag (NO tools)
+                    tier == "tier1" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "simple-tier1"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # proofreader-tier1: Tier1 with general tag (NO tools) - same as simple-tier1
+                    tier == "tier1" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "proofreader-tier1"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # simple-tier2: Tier2 with general + programming tags (NO tools)
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") && contains(model.tags, "programming") ? {
+                      model_name = "simple-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # shell-tier2: Tier2 with general tag, NOT programming tag (NO tools)
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "shell-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # shell-commander-tier2: Tier2 with general tag (may or may not have tools)
+                    tier == "tier2" && contains(model.tags, "general") ? {
+                      model_name = "shell-commander-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # simple-websearch-tier2: Tier2 with websearch tag
+                    tier == "tier2" && contains(model.tags, "websearch") ? {
+                      model_name = "simple-websearch-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # simple-websearch-tier3: Tier3 with websearch tag
+                    tier == "tier3" && contains(model.tags, "websearch") ? {
+                      model_name = "simple-websearch-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # simple-websearch-tier4: Tier4 with websearch tag
+                    tier == "tier4" && contains(model.tags, "websearch") ? {
+                      model_name = "simple-websearch-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # backcasting-tier2: Tier2 with thinking tag (NO tools)
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "backcasting-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # delphi-method-tier2: Tier2 with thinking tag (NO tools) - same as backcasting
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "delphi-method-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # branch-tier3: Tier3 with thinking tag (NO tools)
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "branch-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # backcasting-tier3: Tier3 with thinking tag (NO tools) - same as branch-tier3
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "backcasting-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # delphi-method-tier3: Tier3 with thinking tag (NO tools) - same as branch-tier3
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "delphi-method-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # consensus-tier3: Tier3 with general tag (NO tools)
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "consensus-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # angel-devil-tier3: Tier3 with general tag (NO tools) - same as consensus-tier3
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "angel-devil-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # adversarial-validation-tier3: Tier3 with general tag (NO tools) - same as consensus-tier3
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "adversarial-validation-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # chain-of-verification-tier3: Tier3 with general tag (NO tools) - same as consensus-tier3
+                    tier == "tier3" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "chain-of-verification-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # consensus-tier2: Tier2 with general tag (NO tools)
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "consensus-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # angel-devil-tier2: Tier2 with general tag (NO tools) - same as consensus-tier2
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "angel-devil-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # adversarial-validation-tier2: Tier2 with general tag (NO tools) - same as consensus-tier2
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "adversarial-validation-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # chain-of-verification-tier2: Tier2 with general tag (NO tools) - same as consensus-tier2
+                    tier == "tier2" && !contains(model.tags, "tools") && contains(model.tags, "general") ? {
+                      model_name = "chain-of-verification-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # dialectic-tier2: Tier2 with general OR websearch tags (NO tools)
+                    tier == "tier2" && !contains(model.tags, "tools") && (contains(model.tags, "general") || contains(model.tags, "websearch")) ? {
+                      model_name = "dialectic-tier2"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # branch-tier4: Tier4 with thinking tag (NO tools)
+                    tier == "tier4" && !contains(model.tags, "tools") && contains(model.tags, "thinking") ? {
+                      model_name = "branch-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # architecture-tier4: Tier4 with thinking AND programming tags (NO tools)
+                    tier == "tier4" && !contains(model.tags, "tools") && contains(model.tags, "thinking") && contains(model.tags, "programming") ? {
+                      model_name = "architecture-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # code-reviewer-tier3: Tier3 with tools + programming
+                    tier == "tier3" && contains(model.tags, "tools") && contains(model.tags, "programming") ? {
+                      model_name = "code-reviewer-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # code-reviewer-tier4: Tier4 with tools + programming
+                    tier == "tier4" && contains(model.tags, "tools") && contains(model.tags, "programming") ? {
+                      model_name = "code-reviewer-tier4"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # documentation-writer-tier3: Tier3 with tools + general (NOT programming)
+                    tier == "tier3" && contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "documentation-writer-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null,
+
+                    # dba-tier3: Tier3 with tools + general (NOT programming) - same as documentation-writer
+                    tier == "tier3" && contains(model.tags, "tools") && contains(model.tags, "general") && !contains(model.tags, "programming") ? {
+                      model_name = "dba-tier3"
+                      litellm_params = {
+                        model       = "openrouter/${model.model_id}"
+                        api_base    = "https://openrouter.ai/api/v1"
+                        api_key     = "os.environ/OPENROUTER_API_KEY"
+                        max_tokens  = model.max_tokens
+                        temperature = model.temperature
+                        top_p       = try(model.top_p, 0.9)
+                      }
+                    } : null
+                  ] : item if item != null
+                ]
+              ])
+          ])
+        ]), # Default entry for each model
+
         [
-          for model in var.litellm_models : merge(
-            {
-              model_name = model.model_name
-              litellm_params = {
-                model    = "openrouter/${model.model_id}"
-                api_base = "https://openrouter.ai/api/v1"
-                api_key  = "os.environ/OPENROUTER_API_KEY"
-                  max_tokens        = model.max_tokens
-    temperature       = model.temperature
-    top_p             = model.top_p
-              }
-            },
-            length(model.tags) > 0 ? {
-              model_info = {
-                tags = model.tags
-              }
-            } : {}
-          )
-        ],
-           [
-          for model in var.litellm_models : merge(
-            {
-              model_name = "auto"
-              litellm_params = {
-                model    = "openrouter/${model.model_id}"
-                api_base = "https://openrouter.ai/api/v1"
-                api_key  = "os.environ/OPENROUTER_API_KEY"
-                  max_tokens        = model.max_tokens
-    temperature       = model.temperature
-    top_p             = model.top_p
-              }
-            },
-            length(model.tags) > 0 ? {
-              model_info = {
-                tags = model.tags
-              }
-            } : {}
-          )
-        ],
+          for model in var.litellm_models : {
+            model_name = model.model_name
+            litellm_params = {
+              model    = "openrouter/${model.model_id}"
+              api_base = "https://openrouter.ai/api/v1"
+              api_key  = "os.environ/OPENROUTER_API_KEY"
+            }
+          }
+        ]
       )
     })
-
   }
 }
 
@@ -178,7 +664,7 @@ resource "kubernetes_deployment" "litellm" {
             name  = "OPENAI_API_KEY"
             value = "dummy-key"
           }
-  
+
           env {
             name = "LITELLM_MASTER_KEY"
             value_from {
@@ -188,6 +674,7 @@ resource "kubernetes_deployment" "litellm" {
               }
             }
           }
+
           env {
             name = "UI_USERNAME"
             value_from {
@@ -197,6 +684,7 @@ resource "kubernetes_deployment" "litellm" {
               }
             }
           }
+
           env {
             name = "UI_PASSWORD"
             value_from {

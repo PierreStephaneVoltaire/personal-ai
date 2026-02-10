@@ -138,7 +138,7 @@ resource "kubernetes_deployment" "mcp_server" {
               }
               limits = {
                 memory = "${floor(1024 * 1.5 / length(var.mcp_servers))}Mi"
-                cpu    = "${floor(1024  / length(var.mcp_servers))}m"
+                cpu    = "${floor(1024 / length(var.mcp_servers))}m"
               }
             }
           }
