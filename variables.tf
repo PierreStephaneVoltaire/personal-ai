@@ -47,15 +47,22 @@ variable "litellm_models" {
   type = list(object({
     model_name        = string
     model_id          = string
-    max_tokens        = number
     temperature       = number
     top_p             = optional(number)
     frequency_penalty = optional(number)
     presence_penalty  = optional(number)
     reasoning_effort  = optional(string)
-    tags              = optional(list(string), [])
   }))
   default = []
+}
+
+# Flow-tier routing: maps model_name to flow-tier combinations
+# App calls LiteLLM with "{flow}-{tier}" (e.g., "consensus-tier2")
+# LiteLLM simple-shuffle routes to any model in this list
+variable "flow_tier_models" {
+  description = "Explicit mapping of flow-tier model groups to model names"
+  type        = map(list(string))
+  default     = {}
 }
 
 # MCP Configuration
